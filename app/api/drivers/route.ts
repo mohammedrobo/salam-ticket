@@ -9,7 +9,7 @@ export async function GET() {
       .from('drivers')
       .select('*')
       .eq('status', 'waiting')
-      .order('scanned_at', { ascending: false });
+      .order('scanned_at', { ascending: true });
 
     if (error) {
       console.error('GET drivers error:', error);
