@@ -37,15 +37,17 @@ export default function ScanPage() {
         body: JSON.stringify({ name: trimmed }),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
         localStorage.setItem('driverName', trimmed);
         setSubmitted(true);
       } else {
-        const data = await res.json();
-        setError(data.error || 'Something went wrong');
+        setError(data.error || `Server error (${res.status})`);
       }
-    } catch {
-      setError('Network error — try again');
+    } catch (err) {
+      console.error('Check-in error:', err);
+      setError('Network error — check your connection');
     } finally {
       setIsSubmitting(false);
     }

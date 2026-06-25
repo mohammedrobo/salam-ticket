@@ -1,23 +1,17 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'drivers.db');
+let supabase: SupabaseClient;
 
-const dataDir = path.join(process.cwd(), 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+function getSupabase() {
+  if (!supabase) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      throw new Error('Missing Supabase environment variables');
+    }
+    supabase = createClient(url, key);
+  }
+  return supabase;
 }
 
-const db = new Database(DB_PATH);
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS drivers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    status TEXT DEFAULT 'waiting'
-  )
-`);
-
-export default db;
+export default getSupabase;
