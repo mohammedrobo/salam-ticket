@@ -537,6 +537,27 @@ body::before {
   box-shadow: var(--shadow-lg);
 }
 
+.driver-position {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.driver-position span {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
 .driver-card .avatar {
   width: 52px;
   height: 52px;

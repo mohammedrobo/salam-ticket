@@ -11,10 +11,12 @@ interface Driver {
 
 const DriverCard = memo(function DriverCard({
   driver,
+  position,
   isDeleting,
   onDelete,
 }: {
   driver: Driver;
+  position: number;
   isDeleting: boolean;
   onDelete: (id: number) => void;
 }) {
@@ -51,6 +53,11 @@ const DriverCard = memo(function DriverCard({
     <div
       className={`driver-card ${isDeleting ? 'opacity-0 scale-[0.97]' : ''}`}
     >
+      {/* Position number */}
+      <div className="driver-position">
+        <span>{position}</span>
+      </div>
+
       {/* Avatar */}
       <div className="avatar">
         <span>{initials}</span>
@@ -292,6 +299,7 @@ export default function Dashboard() {
                 >
                   <DriverCard
                     driver={driver}
+                    position={index + 1}
                     isDeleting={deletingRef.current === driver.id}
                     onDelete={handleDelete}
                   />

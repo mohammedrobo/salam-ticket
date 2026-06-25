@@ -32,6 +32,21 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabase();
+
+    // Check if driver is already in the queue
+    const { data: existing } = await supabase
+      .from('drivers')
+      .select('id')
+      .eq('name', name.trim())
+      .eq('status', 'waiting')
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json(
+        { error: 'You are already in the queue. Wait for the manager to check you out.' },
+        { status: 409 }
+      );
+    }
     
     const { data, error } = await supabase
       .from('drivers')
