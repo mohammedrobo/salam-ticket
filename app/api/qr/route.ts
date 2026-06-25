@@ -4,21 +4,19 @@ import QRCode from 'qrcode';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   
-  // Get the actual domain from request headers
   const host = request.headers.get('host');
   const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  
+  const office = searchParams.get('office') || 'QCA2';
   
   let scanUrl: string;
   
   if (searchParams.get('url')) {
-    // Allow manual override
     scanUrl = searchParams.get('url')!;
   } else if (host) {
-    // Auto-detect from request
-    scanUrl = `${protocol}://${host}/scan`;
+    scanUrl = `${protocol}://${host}/scan?office=${encodeURIComponent(office)}`;
   } else {
-    // Fallback for local development
-    scanUrl = 'http://localhost:3000/scan';
+    scanUrl = `http://localhost:3000/scan?office=${encodeURIComponent(office)}`;
   }
 
   const svg = await QRCode.toString(scanUrl, {

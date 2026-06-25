@@ -1,15 +1,20 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 interface Driver {
   id: number;
   name: string;
   scanned_at: string;
   status: string;
+  office_id: string;
 }
 
-export default function ScanPage() {
+function ScanContent() {
+  const searchParams = useSearchParams();
+  const office = searchParams.get('office') || 'QCA2';
+
   const [name, setName] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
@@ -24,12 +29,12 @@ export default function ScanPage() {
 
   useEffect(() => {
     setMounted(true);
-    savedNameRef.current = localStorage.getItem('driverName');
+    savedNameRef.current = localStorage.getItem(`driverName_${office}`);
     if (savedNameRef.current) {
       setName(savedNameRef.current);
     }
     setTimeout(() => inputRef.current?.focus(), 600);
-  }, []);
+  }, [office]);
 
   // Poll queue position after check-in
   useEffect(() => {
@@ -45,7 +50,6 @@ export default function ScanPage() {
         );
 
         if (myIndex === -1) {
-          // Driver no longer in queue — manager checked them out
           setCheckedOut(true);
           return;
         }
@@ -78,13 +82,13 @@ export default function ScanPage() {
       const res = await fetch('/api/drivers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({ name: trimmed, office_id: office }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        localStorage.setItem('driverName', trimmed);
+        localStorage.setItem(`driverName_${office}`, trimmed);
         driverNameRef.current = trimmed;
         setSubmitted(true);
       } else {
@@ -96,7 +100,7 @@ export default function ScanPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [name]);
+  }, [name, office]);
 
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
@@ -125,7 +129,7 @@ export default function ScanPage() {
                 filter: 'blur(24px)'
               }} />
 
-              <div className="relative glass-luxury rounded-3xl px-12 py-14 text-center">
+              <div className="relative glass-luxury rounded-3xl px-10 py-10 text-center">
                 <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
                   <div className="absolute inset-0" style={{
                     background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(52, 211, 153, 0.04) 0%, transparent 60%)'
@@ -133,7 +137,7 @@ export default function ScanPage() {
                 </div>
 
                 <div className="relative">
-                  <div className="mb-10">
+                  <div className="mb-6">
                     <div className="mx-auto success-ring animate-success-ring" style={{
                       background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.1) 0%, rgba(52, 211, 153, 0.03) 100%)',
                       borderColor: 'rgba(52, 211, 153, 0.12)'
@@ -156,7 +160,7 @@ export default function ScanPage() {
                     {driverNameRef.current}, the manager is ready for you
                   </p>
 
-                  <div className="mt-10 mb-8 mx-auto w-12 h-px" style={{
+                  <div className="my-8 mx-auto w-12 h-px" style={{
                     background: 'linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.2), transparent)'
                   }} />
 
@@ -186,13 +190,11 @@ export default function ScanPage() {
 
     return (
       <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-        {/* Premium background */}
         <div className="absolute inset-0 bg-[#06060a]" />
         <div className="absolute inset-0 opacity-40" style={{
           background: `radial-gradient(ellipse 50% 50% at 50% 50%, ${accentGlow} 0.06) 0%, transparent 70%)`
         }} />
 
-        {/* Floating ambient orbs */}
         <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full opacity-[0.03] animate-float" style={{
           background: `radial-gradient(circle, ${accentGlow} 0.4) 0%, transparent 70%)`,
           filter: 'blur(80px)'
@@ -205,16 +207,13 @@ export default function ScanPage() {
 
         <div className="relative z-10 w-full max-w-[480px] px-8">
           <div className={`transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-            {/* Success card */}
             <div className="relative">
-              {/* Glow behind card */}
               <div className="absolute -inset-2 rounded-3xl opacity-60" style={{
                 background: `radial-gradient(ellipse at center, ${accentGlow} 0.08) 0%, transparent 70%)`,
                 filter: 'blur(24px)'
               }} />
 
-              <div className="relative glass-luxury rounded-3xl px-12 py-14 text-center">
-                {/* Radial gradient overlay */}
+              <div className="relative glass-luxury rounded-3xl px-10 py-10 text-center">
                 <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
                   <div className="absolute inset-0" style={{
                     background: `radial-gradient(ellipse 80% 60% at 50% 0%, ${accentGlow} 0.04) 0%, transparent 60%)`
@@ -222,8 +221,7 @@ export default function ScanPage() {
                 </div>
 
                 <div className="relative">
-                  {/* Position number — big and bold */}
-                  <div className="mb-8">
+                  <div className="mb-6">
                     {position !== null ? (
                       <div className={`transition-all duration-500 ${isNext ? 'animate-scale-in' : ''}`}>
                         <span className="font-display text-[80px] font-800 leading-none tracking-tighter" style={{
@@ -238,8 +236,7 @@ export default function ScanPage() {
                     )}
                   </div>
 
-                  {/* Status text */}
-                  <h1 className="font-display text-[28px] font-bold tracking-[-0.03em] mb-2" style={{ color: 'var(--text-primary)' }}>
+                  <h1 className="font-display text-[28px] font-bold tracking-[-0.03em] mb-3" style={{ color: 'var(--text-primary)' }}>
                     {isNext ? "You're next!" : 'In the queue'}
                   </h1>
                   <p className="text-[15px] font-light tracking-wide" style={{ color: 'var(--text-muted)' }}>
@@ -251,12 +248,10 @@ export default function ScanPage() {
                     }
                   </p>
 
-                  {/* Subtle divider */}
-                  <div className="mt-10 mb-8 mx-auto w-12 h-px" style={{
+                  <div className="my-8 mx-auto w-12 h-px" style={{
                     background: `linear-gradient(90deg, transparent, ${accentColor}33, transparent)`
                   }} />
 
-                  {/* Status badge */}
                   <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full" style={{
                     background: `${accentColor}0a`,
                     border: `1px solid ${accentColor}1a`
@@ -267,7 +262,6 @@ export default function ScanPage() {
                     </span>
                   </div>
 
-                  {/* Progress dots */}
                   {position !== null && position > 1 && (
                     <div className="mt-8 flex items-center justify-center gap-1.5">
                       {Array.from({ length: Math.min(position, 8) }, (_, i) => (
@@ -284,6 +278,16 @@ export default function ScanPage() {
                       ))}
                     </div>
                   )}
+
+                  {/* Office badge */}
+                  <div className="mt-6 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{
+                    background: 'rgba(77, 141, 255, 0.06)',
+                    border: '1px solid rgba(77, 141, 255, 0.1)'
+                  }}>
+                    <span className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--accent-blue)' }}>
+                      {office}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -295,10 +299,8 @@ export default function ScanPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Deep dark background */}
       <div className="absolute inset-0 bg-[#06060a]" />
 
-      {/* Atmospheric gradient orbs */}
       <div className="absolute top-[-10%] left-[-5%] w-[700px] h-[700px] rounded-full animate-float" style={{
         background: 'radial-gradient(circle, rgba(232, 175, 74, 0.025) 0%, transparent 70%)',
         filter: 'blur(100px)'
@@ -314,7 +316,6 @@ export default function ScanPage() {
         animationDelay: '4s'
       }} />
 
-      {/* Grid pattern overlay */}
       <div className="absolute inset-0 opacity-[0.015]" style={{
         backgroundImage: `
           linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
@@ -323,10 +324,8 @@ export default function ScanPage() {
         backgroundSize: '80px 80px'
       }} />
 
-      {/* Main content */}
       <div className="relative z-10 w-full max-w-[480px] px-8">
-        {/* Logo / Brand mark */}
-        <div className={`text-center mb-12 transition-all duration-700 delay-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+        <div className={`text-center mb-10 transition-all duration-700 delay-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
           <div className="mx-auto mb-6 brand-mark">
             <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center relative" style={{
               background: 'linear-gradient(135deg, rgba(232, 175, 74, 0.12) 0%, rgba(232, 175, 74, 0.04) 100%)',
@@ -338,7 +337,6 @@ export default function ScanPage() {
                 <path d="M9 17h6" />
                 <circle cx="17" cy="17" r="2" />
               </svg>
-              {/* Subtle glow */}
               <div className="absolute inset-0 rounded-2xl" style={{
                 background: 'radial-gradient(circle at center, rgba(232, 175, 74, 0.06) 0%, transparent 70%)'
               }} />
@@ -348,27 +346,31 @@ export default function ScanPage() {
           <h1 className="font-display text-[34px] font-bold tracking-[-0.04em] mb-3" style={{ color: 'var(--text-primary)' }}>
             Driver Check-In
           </h1>
-          <p className="text-[15px] tracking-wide" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-[15px] tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>
             Enter your name to join the queue
           </p>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{
+            background: 'rgba(77, 141, 255, 0.06)',
+            border: '1px solid rgba(77, 141, 255, 0.1)'
+          }}>
+            <span className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--accent-blue)' }}>
+              {office}
+            </span>
+          </div>
         </div>
 
-        {/* Form card */}
         <div className={`transition-all duration-700 delay-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
           <div className="relative">
-            {/* Card glow */}
             <div className="absolute -inset-px rounded-3xl opacity-50 pointer-events-none" style={{
               background: 'radial-gradient(ellipse at 50% 0%, rgba(232, 175, 74, 0.04) 0%, transparent 60%)'
             }} />
 
             <div className="glass-luxury rounded-3xl px-10 py-10 relative">
-              {/* Top edge highlight */}
               <div className="absolute top-0 left-10 right-10 h-px" style={{
                 background: 'linear-gradient(90deg, transparent, rgba(232, 175, 74, 0.12), transparent)'
               }} />
 
               <form onSubmit={handleSubmit}>
-                {/* Input group */}
                 <div className="mb-8">
                   <label className="block text-[11px] font-semibold mb-3 tracking-[0.15em] uppercase" style={{ color: 'var(--text-ghost)' }}>
                     Full Name
@@ -383,7 +385,6 @@ export default function ScanPage() {
                       className="premium-input w-full"
                       autoComplete="name"
                     />
-                    {/* Focus glow */}
                     <div className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-500 opacity-0 group-focus-within:opacity-100" style={{
                       background: 'radial-gradient(ellipse at center, rgba(232, 175, 74, 0.04) 0%, transparent 70%)',
                       transform: 'scale(1.5)'
@@ -391,7 +392,6 @@ export default function ScanPage() {
                   </div>
                 </div>
 
-                {/* Error */}
                 {error && (
                   <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-xl animate-fade-in" style={{
                     background: 'rgba(255, 107, 107, 0.06)',
@@ -406,7 +406,6 @@ export default function ScanPage() {
                   </div>
                 )}
 
-                {/* Submit button */}
                 <button
                   type="submit"
                   disabled={isSubmitting || !name.trim()}
@@ -431,8 +430,7 @@ export default function ScanPage() {
                 </button>
               </form>
 
-              {/* Footer note */}
-              <div className="mt-7 pt-6 text-center" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.03)' }}>
+              <div className="mt-6 pt-5 text-center" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.03)' }}>
                 <p className="text-[11px] tracking-wide" style={{ color: 'var(--text-ghost)' }}>
                   Name saved for future check-ins
                 </p>
@@ -442,5 +440,17 @@ export default function ScanPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ScanPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#06060a]">
+        <div className="shimmer w-48 h-8 rounded-lg" />
+      </div>
+    }>
+      <ScanContent />
+    </Suspense>
   );
 }

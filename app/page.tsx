@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Driver {
   id: number;
   name: string;
   scanned_at: string;
   status: string;
+  office_id: string;
 }
 
 const DriverCard = memo(function DriverCard({
@@ -102,17 +104,48 @@ const SkeletonCard = memo(function SkeletonCard() {
 export default function Dashboard() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
+  const [office, setOffice] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const deletingRef = useRef<number | null>(null);
   const [, forceRender] = useState(0);
   const qrRef = useRef<string>('/api/qr');
+  const router = useRouter();
+
+  // Check auth on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          setOffice(data.office);
+        } else {
+          router.push('/login');
+          return;
+        }
+      } catch {
+        router.push('/login');
+        return;
+      } finally {
+        setAuthChecked(true);
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   useEffect(() => {
-    qrRef.current = `/api/qr?t=${Date.now()}`;
-  }, []);
+    if (office) {
+      qrRef.current = `/api/qr?office=${office}&t=${Date.now()}`;
+    }
+  }, [office]);
 
   const fetchDrivers = useCallback(async () => {
     try {
       const res = await fetch('/api/drivers');
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
       const data = await res.json();
       setDrivers(data);
     } catch {
@@ -120,13 +153,14 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
+    if (!office) return;
     fetchDrivers();
     const interval = setInterval(fetchDrivers, 3000);
     return () => clearInterval(interval);
-  }, [fetchDrivers]);
+  }, [fetchDrivers, office]);
 
   const handleDelete = useCallback(async (id: number) => {
     deletingRef.current = id;
@@ -146,9 +180,21 @@ export default function Dashboard() {
   }, []);
 
   const handleRefreshQr = useCallback(() => {
-    qrRef.current = `/api/qr?t=${Date.now()}`;
-    forceRender((n) => n + 1);
-  }, []);
+    if (office) {
+      qrRef.current = `/api/qr?office=${office}&t=${Date.now()}`;
+      forceRender((n) => n + 1);
+    }
+  }, [office]);
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen mesh-gradient flex items-center justify-center">
+        <div className="shimmer w-48 h-8 rounded-lg" />
+      </div>
+    );
+  }
+
+  if (!office) return null;
 
   return (
     <div className="min-h-screen mesh-gradient flex flex-col">
@@ -176,8 +222,13 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Header right — system status */}
+            {/* Header right — office name + system status */}
             <div className="flex items-center gap-6 animate-fade-in-up delay-2">
+              <div className="glass rounded-lg px-4 py-2 flex items-center gap-2">
+                <span className="font-display text-[14px] font-700 tracking-tight text-[var(--accent-blue)]">
+                  {office}
+                </span>
+              </div>
               <div className="flex items-center gap-2.5">
                 <div className="w-2 h-2 rounded-full bg-[var(--accent-emerald)] relative">
                   <span className="absolute inset-[-5px] rounded-full bg-[var(--accent-emerald)] opacity-30 animate-pulse" />
@@ -199,7 +250,7 @@ export default function Dashboard() {
           <div className="qr-display animate-scale-in">
             <img
               src={qrRef.current}
-              alt="Driver check-in QR code"
+              alt={`${office} check-in QR code`}
             />
           </div>
 
@@ -221,7 +272,7 @@ export default function Dashboard() {
               Refresh
             </button>
             <a
-              href="/print"
+              href={`/print?office=${office}`}
               target="_blank"
               className="qr-action-btn secondary"
             >
