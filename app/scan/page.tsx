@@ -11,6 +11,18 @@ interface Driver {
   office_id: string;
 }
 
+function generateDeviceId(): string {
+  return crypto.randomUUID();
+}
+
+function getDeviceTokenKey(office: string): string {
+  return `device_token_${office}`;
+}
+
+function getSavedNameKey(office: string): string {
+  return `driverName_${office}`;
+}
+
 function ScanContent() {
   const searchParams = useSearchParams();
   const office = searchParams.get('office') || 'QCA2';
@@ -23,18 +35,69 @@ function ScanContent() {
   const [position, setPosition] = useState<number | null>(null);
   const [aheadCount, setAheadCount] = useState<number>(0);
   const [checkedOut, setCheckedOut] = useState(false);
+  const [deviceLoading, setDeviceLoading] = useState(true);
+  const [welcomeBack, setWelcomeBack] = useState(false);
+  const [registeredName, setRegisteredName] = useState('');
+  const [driverId, setDriverId] = useState<number | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const savedNameRef = useRef<string | null>(null);
   const driverNameRef = useRef<string>('');
+  const deviceIdRef = useRef<string>('');
 
+  // Initialize device token on mount
   useEffect(() => {
     setMounted(true);
-    savedNameRef.current = localStorage.getItem(`driverName_${office}`);
-    if (savedNameRef.current) {
-      setName(savedNameRef.current);
+
+    const storedToken = localStorage.getItem(getDeviceTokenKey(office));
+    if (storedToken) {
+      deviceIdRef.current = storedToken;
+    } else {
+      const newToken = generateDeviceId();
+      deviceIdRef.current = newToken;
+      localStorage.setItem(getDeviceTokenKey(office), newToken);
     }
+
+    // Also load saved name for fallback
+    const savedName = localStorage.getItem(getSavedNameKey(office));
+    if (savedName) {
+      setName(savedName);
+    }
+
     setTimeout(() => inputRef.current?.focus(), 600);
   }, [office]);
+
+  // Check device registration on mount
+  useEffect(() => {
+    if (!deviceIdRef.current) return;
+
+    const checkDevice = async () => {
+      try {
+        const res = await fetch(
+          `/api/drivers/check-device?device_id=${deviceIdRef.current}&office=${office}`
+        );
+        const data = await res.json();
+
+        if (data.registered) {
+          if (data.status === 'waiting') {
+            // Device is in queue — show position directly
+            driverNameRef.current = data.driver.name;
+            setSubmitted(true);
+          } else if (data.status === 'checked_out') {
+            // Device was checked out — show welcome back
+            setRegisteredName(data.driver.name);
+            setWelcomeBack(true);
+            driverNameRef.current = data.driver.name;
+          }
+        }
+      } catch {
+        // Network error — show form as fallback
+      } finally {
+        setDeviceLoading(false);
+      }
+    };
+
+    checkDevice();
+  }, [office, mounted]);
 
   // Poll queue position after check-in
   useEffect(() => {
@@ -56,6 +119,7 @@ function ScanContent() {
 
         setPosition(myIndex + 1);
         setAheadCount(myIndex);
+        setDriverId(drivers[myIndex].id);
       } catch {
         // retry next interval
       }
@@ -82,14 +146,24 @@ function ScanContent() {
       const res = await fetch('/api/drivers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmed, office_id: office }),
+        body: JSON.stringify({
+          name: trimmed,
+          office_id: office,
+          device_id: deviceIdRef.current,
+        }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        localStorage.setItem(`driverName_${office}`, trimmed);
+        localStorage.setItem(getSavedNameKey(office), trimmed);
         driverNameRef.current = trimmed;
+        setSubmitted(true);
+      } else if (data.error === 'device_mismatch') {
+        setError(`This device is already registered to ${data.registered_name}`);
+      } else if (data.error === 'already_in_queue') {
+        // Device is already in queue — show position
+        driverNameRef.current = data.driver.name;
         setSubmitted(true);
       } else {
         setError(data.error || `Server error (${res.status})`);
@@ -102,12 +176,82 @@ function ScanContent() {
     }
   }, [name, office]);
 
+  const handleReJoin = useCallback(async () => {
+    setError('');
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch('/api/drivers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: registeredName,
+          office_id: office,
+          device_id: deviceIdRef.current,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        driverNameRef.current = registeredName;
+        setWelcomeBack(false);
+        setSubmitted(true);
+      } else {
+        setError(data.error || 'Failed to re-join');
+      }
+    } catch (err) {
+      console.error('Re-join error:', err);
+      setError('Network error — check your connection');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [registeredName, office]);
+
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
     setError('');
   }, []);
 
-  // Checked out screen
+  const handleFinish = useCallback(async () => {
+    if (!driverId) return;
+    setIsFinishing(true);
+    try {
+      const res = await fetch(`/api/drivers?id=${driverId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setSubmitted(false);
+        setCheckedOut(false);
+        setPosition(null);
+        setRegisteredName(driverNameRef.current);
+        setWelcomeBack(true);
+      }
+    } catch {
+      // keep user on position screen
+    } finally {
+      setIsFinishing(false);
+    }
+  }, [driverId]);
+
+  const handleDismiss = useCallback(() => {
+    setSubmitted(false);
+    setCheckedOut(false);
+    setPosition(null);
+    setRegisteredName(driverNameRef.current);
+    setWelcomeBack(true);
+  }, []);
+
+  // Loading state while checking device
+  if (deviceLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#06060a]">
+        <div className="shimmer w-48 h-8 rounded-lg" />
+      </div>
+    );
+  }
+
+  // Checked out screen (polling detected removal)
   if (submitted && checkedOut) {
     return (
       <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
@@ -129,7 +273,7 @@ function ScanContent() {
                 filter: 'blur(24px)'
               }} />
 
-              <div className="relative glass-luxury rounded-3xl px-10 py-10 text-center">
+              <div className="relative glass-luxury rounded-3xl px-6 py-12 md:px-12 md:py-16 text-center shadow-2xl border border-[var(--border-subtle)] backdrop-blur-2xl">
                 <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
                   <div className="absolute inset-0" style={{
                     background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(52, 211, 153, 0.04) 0%, transparent 60%)'
@@ -153,10 +297,10 @@ function ScanContent() {
                     </div>
                   </div>
 
-                  <h1 className="font-display text-[30px] font-bold tracking-[-0.03em] mb-3" style={{ color: 'var(--text-primary)' }}>
+                  <h1 className="font-display text-[var(--text-5xl)] font-900 tracking-[-0.05em] uppercase mb-4" style={{ color: 'var(--text-primary)' }}>
                     You&apos;re up!
                   </h1>
-                  <p className="text-[15px] font-light tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-[var(--text-xl)] font-light tracking-wide opacity-80" style={{ color: 'var(--text-muted)' }}>
                     {driverNameRef.current}, the manager is ready for you
                   </p>
 
@@ -164,7 +308,7 @@ function ScanContent() {
                     background: 'linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.2), transparent)'
                   }} />
 
-                  <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full" style={{
+                  <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full mb-8" style={{
                     background: 'rgba(52, 211, 153, 0.06)',
                     border: '1px solid rgba(52, 211, 153, 0.1)'
                   }}>
@@ -173,6 +317,25 @@ function ScanContent() {
                       Go to dock
                     </span>
                   </div>
+
+                  <button
+                    onClick={handleDismiss}
+                    className="w-full relative group overflow-hidden rounded-2xl p-[2px] transition-all duration-300"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.5) 0%, rgba(16, 185, 129, 0.8) 100%)',
+                      boxShadow: '0 8px 32px rgba(52, 211, 153, 0.3)'
+                    }}
+                  >
+                    <div className="absolute inset-0 bg-white/20 blur-md group-hover:bg-white/30 transition-all duration-300" />
+                    <div className="relative bg-[#06060a]/90 backdrop-blur-xl rounded-xl px-8 py-5 flex items-center justify-center gap-3 transition-all duration-300 group-hover:bg-transparent">
+                      <span className="flex items-center justify-center gap-3 text-white font-display text-[var(--text-xl)] font-900 tracking-wide uppercase">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        Complete Order
+                      </span>
+                    </div>
+                  </button>
                 </div>
               </div>
             </div>
@@ -213,7 +376,7 @@ function ScanContent() {
                 filter: 'blur(24px)'
               }} />
 
-              <div className="relative glass-luxury rounded-3xl px-10 py-10 text-center">
+              <div className="relative glass-luxury rounded-3xl px-6 py-12 md:px-12 md:py-16 text-center shadow-2xl border border-[var(--border-subtle)] backdrop-blur-2xl">
                 <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
                   <div className="absolute inset-0" style={{
                     background: `radial-gradient(ellipse 80% 60% at 50% 0%, ${accentGlow} 0.04) 0%, transparent 60%)`
@@ -224,7 +387,7 @@ function ScanContent() {
                   <div className="mb-6">
                     {position !== null ? (
                       <div className={`transition-all duration-500 ${isNext ? 'animate-scale-in' : ''}`}>
-                        <span className="font-display text-[80px] font-800 leading-none tracking-tighter" style={{
+                        <span className="font-display text-[100px] md:text-[140px] font-900 leading-none tracking-tighter block mb-6 md:mb-8" style={{
                           color: accentColor,
                           textShadow: `0 0 60px ${accentGlow} 0.3)`
                         }}>
@@ -236,10 +399,10 @@ function ScanContent() {
                     )}
                   </div>
 
-                  <h1 className="font-display text-[28px] font-bold tracking-[-0.03em] mb-3" style={{ color: 'var(--text-primary)' }}>
+                  <h1 className="font-display text-[var(--text-4xl)] font-900 tracking-[-0.04em] uppercase mb-4" style={{ color: 'var(--text-primary)' }}>
                     {isNext ? "You're next!" : 'In the queue'}
                   </h1>
-                  <p className="text-[15px] font-light tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-[var(--text-lg)] font-light tracking-wide opacity-80" style={{ color: 'var(--text-muted)' }}>
                     {driverNameRef.current}, {isNext
                       ? 'get ready — you\'ll be called shortly'
                       : aheadCount === 1
@@ -279,6 +442,39 @@ function ScanContent() {
                     </div>
                   )}
 
+                  {isNext && (
+                    <div className="mt-8">
+                      <button
+                        onClick={handleFinish}
+                        disabled={isFinishing}
+                        className="w-full relative group overflow-hidden rounded-2xl p-[2px] transition-all duration-300"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.5) 0%, rgba(16, 185, 129, 0.8) 100%)',
+                          boxShadow: '0 8px 32px rgba(52, 211, 153, 0.3)'
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-white/20 blur-md group-hover:bg-white/30 transition-all duration-300" />
+                        <div className="relative bg-[#06060a]/90 backdrop-blur-xl rounded-xl px-8 py-5 flex items-center justify-center gap-3 transition-all duration-300 group-hover:bg-transparent">
+                        {isFinishing ? (
+                          <span className="flex items-center justify-center gap-3 text-white font-display text-[var(--text-lg)] font-800 tracking-wide uppercase">
+                            <svg className="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                            </svg>
+                            Finishing...
+                          </span>
+                        ) : (
+                          <span className="flex items-center justify-center gap-3 text-white font-display text-[var(--text-xl)] font-900 tracking-wide uppercase">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            Complete
+                          </span>
+                        )}
+                        </div>
+                      </button>
+                    </div>
+                  )}
+
                   {/* Office badge */}
                   <div className="mt-6 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{
                     background: 'rgba(77, 141, 255, 0.06)',
@@ -297,6 +493,110 @@ function ScanContent() {
     );
   }
 
+  // Welcome back screen (device recognized, was checked out)
+  if (welcomeBack) {
+    return (
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[#06060a]" />
+        <div className="absolute inset-0 opacity-40" style={{
+          background: 'radial-gradient(ellipse 50% 50% at 50% 50%, rgba(77, 141, 255, 0.06) 0%, transparent 70%)'
+        }} />
+
+        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full opacity-[0.03] animate-float" style={{
+          background: 'radial-gradient(circle, rgba(77, 141, 255, 0.4) 0%, transparent 70%)',
+          filter: 'blur(80px)'
+        }} />
+
+        <div className="relative z-10 w-full max-w-[480px] px-8">
+          <div className={`transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+            <div className="relative">
+              <div className="absolute -inset-2 rounded-3xl opacity-60" style={{
+                background: 'radial-gradient(ellipse at center, rgba(77, 141, 255, 0.08) 0%, transparent 70%)',
+                filter: 'blur(24px)'
+              }} />
+
+              <div className="relative glass-luxury rounded-3xl px-6 py-12 md:px-12 md:py-16 text-center shadow-2xl border border-[var(--border-subtle)] backdrop-blur-2xl">
+                <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
+                  <div className="absolute inset-0" style={{
+                    background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(77, 141, 255, 0.04) 0%, transparent 60%)'
+                  }} />
+                </div>
+
+                <div className="relative">
+                  <div className="mb-6">
+                    <div className="mx-auto w-20 h-20 rounded-full flex items-center justify-center" style={{
+                      background: 'linear-gradient(135deg, rgba(77, 141, 255, 0.1) 0%, rgba(77, 141, 255, 0.03) 100%)',
+                      border: '1px solid rgba(77, 141, 255, 0.12)'
+                    }}>
+                      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-80">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <h1 className="font-display text-[var(--text-4xl)] font-900 tracking-[-0.04em] uppercase mb-4" style={{ color: 'var(--text-primary)' }}>
+                    Welcome back
+                  </h1>
+                  <p className="text-[var(--text-xl)] font-light tracking-wide mb-2 opacity-90" style={{ color: 'var(--text-primary)' }}>
+                    {registeredName}
+                  </p>
+                  <p className="text-[var(--text-base)] tracking-wide mb-8" style={{ color: 'var(--text-ghost)' }}>
+                    Ready to re-join the queue?
+                  </p>
+
+                  {error && (
+                    <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-xl animate-fade-in" style={{
+                      background: 'rgba(255, 107, 107, 0.06)',
+                      border: '1px solid rgba(255, 107, 107, 0.1)'
+                    }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span className="text-[13px]" style={{ color: 'var(--accent-red)' }}>{error}</span>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleReJoin}
+                    disabled={isSubmitting}
+                    className="premium-button w-full"
+                  >
+                    {isSubmitting ? (
+                      <span className="flex items-center justify-center gap-3">
+                        <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                        </svg>
+                        Joining...
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        Re-Join Queue
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                          <polyline points="12 5 19 12 12 19" />
+                        </svg>
+                      </span>
+                    )}
+                  </button>
+
+                  <div className="mt-6 pt-5 text-center" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.03)' }}>
+                    <p className="text-[11px] tracking-wide" style={{ color: 'var(--text-ghost)' }}>
+                      {office}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Name form (first-time or unrecognized device)
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
       <div className="absolute inset-0 bg-[#06060a]" />
@@ -343,10 +643,10 @@ function ScanContent() {
             </div>
           </div>
 
-          <h1 className="font-display text-[34px] font-bold tracking-[-0.04em] mb-3" style={{ color: 'var(--text-primary)' }}>
-            Driver Check-In
+          <h1 className="font-display text-[var(--text-5xl)] font-900 tracking-[-0.05em] uppercase mb-4" style={{ color: 'var(--text-primary)' }}>
+            Check-In
           </h1>
-          <p className="text-[15px] tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-[var(--text-lg)] tracking-wide mb-6 opacity-80" style={{ color: 'var(--text-muted)' }}>
             Enter your name to join the queue
           </p>
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{
@@ -365,14 +665,14 @@ function ScanContent() {
               background: 'radial-gradient(ellipse at 50% 0%, rgba(232, 175, 74, 0.04) 0%, transparent 60%)'
             }} />
 
-            <div className="glass-luxury rounded-3xl px-10 py-10 relative">
+            <div className="glass-luxury rounded-3xl px-6 py-12 md:px-12 md:py-16 relative shadow-2xl border border-[var(--border-subtle)] backdrop-blur-2xl">
               <div className="absolute top-0 left-10 right-10 h-px" style={{
                 background: 'linear-gradient(90deg, transparent, rgba(232, 175, 74, 0.12), transparent)'
               }} />
 
               <form onSubmit={handleSubmit}>
                 <div className="mb-8">
-                  <label className="block text-[11px] font-semibold mb-3 tracking-[0.15em] uppercase" style={{ color: 'var(--text-ghost)' }}>
+                  <label className="block text-[var(--text-sm)] font-bold mb-4 tracking-[0.2em] uppercase" style={{ color: 'var(--text-ghost)' }}>
                     Full Name
                   </label>
                   <div className="relative group">
@@ -432,7 +732,7 @@ function ScanContent() {
 
               <div className="mt-6 pt-5 text-center" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.03)' }}>
                 <p className="text-[11px] tracking-wide" style={{ color: 'var(--text-ghost)' }}>
-                  Name saved for future check-ins
+                  Your device is remembered for faster check-in
                 </p>
               </div>
             </div>

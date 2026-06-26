@@ -14,13 +14,9 @@ interface Driver {
 const DriverCard = memo(function DriverCard({
   driver,
   position,
-  isDeleting,
-  onDelete,
 }: {
   driver: Driver;
   position: number;
-  isDeleting: boolean;
-  onDelete: (id: number) => void;
 }) {
   const initials = driver.name
     .split(' ')
@@ -52,9 +48,7 @@ const DriverCard = memo(function DriverCard({
   }
 
   return (
-    <div
-      className={`driver-card ${isDeleting ? 'opacity-0 scale-[0.97]' : ''}`}
-    >
+    <div className={`driver-card ${position === 1 ? 'ring-1 ring-[var(--accent-emerald)]/30 shadow-[0_8px_32px_rgba(52,211,153,0.1)] bg-[var(--accent-emerald)]/[0.02]' : ''}`}>
       {/* Position number */}
       <div className="driver-position">
         <span>{position}</span>
@@ -66,8 +60,9 @@ const DriverCard = memo(function DriverCard({
       </div>
 
       {/* Info */}
-      <div className="info">
-        <h3>{driver.name}</h3>
+      <div className="info flex justify-between items-center w-full gap-4">
+        <div className="flex-1 min-w-0">
+          <h3 className="truncate mb-1">{driver.name}</h3>
         <div className="meta">
           <span className="meta-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -76,23 +71,32 @@ const DriverCard = memo(function DriverCard({
             </svg>
             {time}
           </span>
-          <span className="meta-item time-ago">
-            {timeAgo}
-          </span>
+            <span className="meta-item time-ago shrink-0">
+              {timeAgo}
+            </span>
+          </div>
+        </div>
+
+        {/* Status Badge */}
+        <div className="shrink-0">
+          {position === 1 ? (
+            <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/10 shadow-[0_0_20px_rgba(52,211,153,0.15)] relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--accent-emerald)]/20 to-transparent -translate-x-[200%] animate-[shimmer_3s_infinite]" />
+              <div className="w-2 h-2 rounded-full bg-[var(--accent-emerald)] animate-pulse shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
+              <span className="text-[11px] font-900 tracking-[0.2em] uppercase text-[var(--accent-emerald)] relative z-10">
+                Next Up
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border-subtle)] bg-white/[0.02]">
+              <div className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)]" />
+              <span className="text-[11px] font-800 tracking-[0.15em] uppercase text-[var(--text-muted)]">
+                Waiting
+              </span>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Action */}
-      <button
-        onClick={() => onDelete(driver.id)}
-        disabled={isDeleting}
-        className="btn-danger disabled:opacity-30 disabled:cursor-not-allowed"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-        {isDeleting ? '...' : 'Done'}
-      </button>
     </div>
   );
 });
@@ -106,7 +110,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [office, setOffice] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const deletingRef = useRef<number | null>(null);
   const [, forceRender] = useState(0);
   const qrRef = useRef<string>('/api/qr');
   const router = useRouter();
@@ -162,23 +165,6 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [fetchDrivers, office]);
 
-  const handleDelete = useCallback(async (id: number) => {
-    deletingRef.current = id;
-    forceRender((n) => n + 1);
-
-    await new Promise((r) => setTimeout(r, 200));
-
-    try {
-      await fetch(`/api/drivers?id=${id}`, { method: 'DELETE' });
-      setDrivers((prev) => prev.filter((d) => d.id !== id));
-    } catch {
-      // retry on next interval
-    } finally {
-      deletingRef.current = null;
-      forceRender((n) => n + 1);
-    }
-  }, []);
-
   const handleRefreshQr = useCallback(() => {
     if (office) {
       qrRef.current = `/api/qr?office=${office}&t=${Date.now()}`;
@@ -199,8 +185,8 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen mesh-gradient flex flex-col">
       {/* Header */}
-      <header className="border-b border-white/[0.04]">
-        <div className="max-w-[1440px] mx-auto px-8 py-5">
+      <header className="border-b border-white/[0.04] bg-[var(--bg-elevated)]/50 backdrop-blur-xl relative z-20">
+        <div className="max-w-[1600px] mx-auto px-10 py-8">
           <div className="flex items-center justify-between">
             {/* Brand */}
             <div className="flex items-center gap-4 animate-fade-in-up">
@@ -213,10 +199,10 @@ export default function Dashboard() {
                 </svg>
               </div>
               <div>
-                <h1 className="font-display text-[22px] font-800 tracking-tight leading-none">
+                <h1 className="font-display text-[var(--text-2xl)] font-800 tracking-[-0.05em] leading-none uppercase">
                   Fleet Manager
                 </h1>
-                <p className="text-[var(--text-muted)] text-[13px] mt-0.5 tracking-widest uppercase font-semibold">
+                <p className="text-[var(--accent-blue)] text-[var(--text-xs)] mt-1.5 tracking-[0.2em] uppercase font-bold">
                   Driver Check-In
                 </p>
               </div>
@@ -224,16 +210,16 @@ export default function Dashboard() {
 
             {/* Header right — office name + system status */}
             <div className="flex items-center gap-6 animate-fade-in-up delay-2">
-              <div className="glass rounded-lg px-4 py-2 flex items-center gap-2">
-                <span className="font-display text-[14px] font-700 tracking-tight text-[var(--accent-blue)]">
+              <div className="glass rounded-xl px-5 py-2.5 flex items-center gap-3">
+                <span className="font-display text-[var(--text-lg)] font-800 tracking-[-0.02em] text-[var(--text-primary)]">
                   {office}
                 </span>
               </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-2 h-2 rounded-full bg-[var(--accent-emerald)] relative">
-                  <span className="absolute inset-[-5px] rounded-full bg-[var(--accent-emerald)] opacity-30 animate-pulse" />
+              <div className="flex items-center gap-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent-emerald)] relative">
+                  <span className="absolute inset-[-6px] rounded-full bg-[var(--accent-emerald)] opacity-30 animate-pulse" />
                 </div>
-                <span className="text-[var(--text-muted)] text-[13px] font-semibold uppercase tracking-widest">
+                <span className="text-[var(--text-muted)] text-[var(--text-xs)] font-bold uppercase tracking-[0.15em]">
                   System <span className="text-[var(--accent-emerald)]">Online</span>
                 </span>
               </div>
@@ -242,10 +228,11 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main content — two column layout */}
-      <div className="max-w-[1440px] mx-auto w-full flex-1 flex flex-col lg:flex-row">
+      {/* Main content — bolder layout */}
+      <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col lg:flex-row gap-12 p-8 relative z-10">
         {/* LEFT: QR Panel */}
-        <div className="qr-panel animate-slide-left">
+        <div className="qr-panel rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br from-[var(--bg-elevated)] to-[var(--bg-surface)] border border-[var(--border-subtle)] animate-slide-left relative">
+          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[var(--accent-blue-glow)] rounded-full blur-[100px] pointer-events-none" />
           {/* QR Code */}
           <div className="qr-display animate-scale-in">
             <img
@@ -255,9 +242,9 @@ export default function Dashboard() {
           </div>
 
           {/* Label */}
-          <div className="qr-label animate-fade-in-up delay-2">
-            <h2>Scan to Check In</h2>
-            <p>Point your camera at the QR code</p>
+          <div className="qr-label animate-fade-in-up delay-2 mt-4 relative z-10">
+            <h2 className="text-[var(--text-3xl)] font-display uppercase tracking-[-0.04em] font-800">Scan to Check In</h2>
+            <p className="text-[var(--text-lg)] opacity-70 mt-2">Point your camera at the QR code</p>
           </div>
 
           {/* Actions */}
@@ -286,18 +273,21 @@ export default function Dashboard() {
           </div>
 
           {/* Quick stats in sidebar */}
-          <div className="flex items-center gap-6 mt-4 animate-fade-in-up delay-4">
-            <div className="text-center">
-              <p className="font-display text-[32px] font-800 tracking-tight leading-none text-[var(--text-primary)]">
+          <div className="flex items-center gap-12 mt-8 p-6 glass rounded-2xl animate-fade-in-up delay-4 relative z-10">
+            <div className="text-left">
+              <p className="text-[var(--text-ghost)] text-[var(--text-xs)] uppercase tracking-[0.2em] font-bold mb-2">
+                Active Drivers
+              </p>
+              <p className="font-display text-[var(--text-5xl)] font-800 tracking-[-0.05em] leading-none text-[var(--text-primary)]">
                 {drivers.length}
               </p>
-              <p className="text-[var(--text-ghost)] text-[11px] uppercase tracking-widest font-semibold mt-1">
-                Active
-              </p>
             </div>
-            <div className="w-px h-10 bg-[var(--border-subtle)]" />
-            <div className="text-center">
-              <p className="font-display text-[32px] font-800 tracking-tight leading-none text-[var(--accent-emerald)]">
+            <div className="w-px h-16 bg-[var(--border-subtle)]" />
+            <div className="text-left">
+              <p className="text-[var(--text-ghost)] text-[var(--text-xs)] uppercase tracking-[0.2em] font-bold mb-2">
+                Queue Status
+              </p>
+              <p className="font-display text-[var(--text-5xl)] font-800 tracking-[-0.05em] leading-none text-[var(--accent-emerald)]">
                 {drivers.length > 0 ? '●' : '○'}
               </p>
               <p className="text-[var(--text-ghost)] text-[11px] uppercase tracking-widest font-semibold mt-1">
@@ -308,10 +298,10 @@ export default function Dashboard() {
         </div>
 
         {/* RIGHT: Driver List */}
-        <div className="driver-list-panel flex-1">
-          <div className="driver-list-header animate-fade-in-up delay-1">
-            <h2>Queue</h2>
-            <span className="count">{drivers.length} waiting</span>
+        <div className="driver-list-panel flex-1 bg-[var(--bg-surface)]/40 rounded-3xl border border-[var(--border-subtle)] backdrop-blur-md">
+          <div className="driver-list-header animate-fade-in-up delay-1 border-b border-[var(--border-subtle)] pb-8 mb-8">
+            <h2 className="text-[var(--text-4xl)] uppercase font-900 tracking-[-0.05em]">Queue</h2>
+            <span className="count bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] px-4 py-2 rounded-full text-[var(--text-sm)] uppercase tracking-widest">{drivers.length} waiting</span>
           </div>
 
           {loading ? (
@@ -351,8 +341,6 @@ export default function Dashboard() {
                   <DriverCard
                     driver={driver}
                     position={index + 1}
-                    isDeleting={deletingRef.current === driver.id}
-                    onDelete={handleDelete}
                   />
                 </div>
               ))}

@@ -1,11 +1,13 @@
 # Fleet Manager — Driver Check-In System
 
-A real-time driver management dashboard for warehouse and logistics operations. Drivers scan a QR code to check in, and managers see them on a live dashboard.
+A real-time driver management dashboard for warehouse and logistics operations. Drivers scan a QR code to check in, and managers see them on a live dashboard. Each office has its own isolated queue and login credentials.
 
 ## How It Works
 
 ```
-Manager opens dashboard → sees QR code + waiting drivers
+Manager logs in at /login → selects office → opens dashboard
+         ↓
+Dashboard shows QR code + live driver queue
          ↓
 Driver scans QR with phone → enters name → appears on dashboard
          ↓
@@ -14,18 +16,26 @@ Driver gets order & leaves → manager clicks "Done" → removed from list
 
 ## Features
 
+- **Office Authentication** — Each office has its own login credentials
+- **Multi-Office Support** — Isolated driver queues per office (QCA2, QCA3, QCA5, QCC8, QCD7)
 - **QR Code Check-In** — Drivers scan a QR code to open the check-in page
 - **Live Dashboard** — Auto-refreshes every 3 seconds to show new drivers
 - **Printable QR** — Print the QR code and post it at your facility
 - **Simple Flow** — Driver enters name once, sees confirmation, done
 - **One-Click Remove** — Manager clicks "Done" when driver leaves
+- **Queue Position** — Drivers see their position in the queue in real-time
 
 ## Tech Stack
 
-- **Frontend:** Next.js 16, React, Tailwind CSS
-- **Database:** Supabase (PostgreSQL)
-- **QR Code:** Generated dynamically per domain
-- **Deployment:** Vercel
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| React | 19 |
+| Language | TypeScript |
+| Styling | Tailwind CSS 4 + custom CSS |
+| Database | Supabase (PostgreSQL) |
+| QR Code | `qrcode` library (server-side SVG) |
+| Deployment | Vercel |
 
 ## Setup
 
@@ -54,7 +64,8 @@ CREATE TABLE drivers (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  status TEXT DEFAULT 'waiting'
+  status TEXT DEFAULT 'waiting',
+  office_id TEXT
 );
 ```
 
@@ -93,27 +104,60 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## Pages
 
-| Page | URL | Purpose |
-|------|-----|---------|
-| Dashboard | `/` | Manager view — QR code + driver list |
-| Check-In | `/scan` | Driver enters their name |
-| Print QR | `/print` | Print-optimized QR code |
+| Page | URL | Purpose | Auth Required |
+|------|-----|---------|---------------|
+| Login | `/login` | Office login (select office + enter password) | No |
+| Dashboard | `/` | Manager view — QR code + driver list | Yes |
+| Check-In | `/scan?office=QCA2` | Driver enters their name | No |
+| Print QR | `/print?office=QCA2` | Print-optimized QR code | No |
+
+## API Routes
+
+| Endpoint | Method | Purpose | Auth |
+|----------|--------|---------|------|
+| `/api/auth/login` | POST | Authenticate office (sets cookie) | No |
+| `/api/auth/me` | GET | Check current session | No |
+| `/api/drivers` | GET | List waiting drivers for current office | Yes |
+| `/api/drivers` | POST | Add new driver to queue | No |
+| `/api/drivers?id=X` | DELETE | Remove driver from queue | Yes |
+| `/api/qr` | GET | Generate QR code SVG | No |
 
 ## Project Structure
 
 ```
 salam-ticket/
 ├── app/
-│   ├── page.tsx          # Dashboard
-│   ├── scan/page.tsx     # Driver check-in
-│   ├── print/page.tsx    # Printable QR
+│   ├── globals.css           # Global styles (dark theme, animations)
+│   ├── layout.tsx            # Root layout (metadata, fonts)
+│   ├── page.tsx              # Dashboard (manager view)
+│   ├── login/
+│   │   └── page.tsx          # Office login page
+│   ├── scan/
+│   │   └── page.tsx          # Driver check-in page
+│   ├── print/
+│   │   └── page.tsx          # Printable QR code page
 │   └── api/
-│       ├── drivers/      # CRUD for drivers
-│       └── qr/           # QR code generation
+│       ├── auth/
+│       │   ├── login/
+│       │   │   └── route.ts  # POST: office login
+│       │   └── me/
+│       │       └── route.ts  # GET: session check
+│       ├── drivers/
+│       │   └── route.ts      # GET/POST/DELETE: driver CRUD
+│       └── qr/
+│           └── route.ts      # GET: QR code SVG generation
 ├── lib/
-│   └── db.ts             # Supabase client
-└── .env.local            # Environment variables
+│   ├── db.ts                 # Supabase client singleton
+│   └── offices.ts            # Office definitions + authentication
+└── .env.local                # Environment variables
 ```
+
+## Authentication
+
+- Cookie-based sessions (`office_session`, httpOnly, 7-day expiry)
+- Office credentials are defined in `lib/offices.ts`
+- Dashboard checks auth on mount; unauthenticated users are redirected to `/login`
+- The `/scan` page is intentionally public (drivers don't need to log in)
 
 ## License
 
