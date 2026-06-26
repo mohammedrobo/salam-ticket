@@ -14,9 +14,11 @@ interface Driver {
 const DriverCard = memo(function DriverCard({
   driver,
   position,
+  isArabic,
 }: {
   driver: Driver;
   position: number;
+  isArabic?: boolean;
 }) {
   const initials = driver.name
     .split(' ')
@@ -26,10 +28,10 @@ const DriverCard = memo(function DriverCard({
     .slice(0, 2);
 
   const scannedDate = new Date(driver.scanned_at + 'Z');
-  const time = scannedDate.toLocaleTimeString('en-US', {
+  const time = scannedDate.toLocaleTimeString(isArabic ? 'ar-SA' : 'en-US', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: true,
+    hour12: !isArabic,
   });
 
   const now = Date.now();
@@ -38,24 +40,29 @@ const DriverCard = memo(function DriverCard({
 
   let timeAgo: string;
   if (diffMins < 1) {
-    timeAgo = 'Just now';
+    timeAgo = isArabic ? 'الآن' : 'Just now';
   } else if (diffMins < 60) {
-    timeAgo = `${diffMins}m ago`;
+    timeAgo = isArabic ? `منذ ${diffMins}د` : `${diffMins}m ago`;
   } else {
     const diffHours = Math.floor(diffMins / 60);
-    timeAgo =
-      diffHours < 24 ? `${diffHours}h ago` : `${Math.floor(diffHours / 24)}d ago`;
+    if (diffHours < 24) {
+      timeAgo = isArabic ? `منذ ${diffHours}س` : `${diffHours}h ago`;
+    } else {
+      timeAgo = isArabic ? `منذ ${Math.floor(diffHours / 24)}ي` : `${Math.floor(diffHours / 24)}d ago`;
+    }
   }
 
+  const isNext = position === 1;
+
   return (
-    <div className={`driver-card ${position === 1 ? 'ring-1 ring-[var(--accent-emerald)]/30 shadow-[0_8px_32px_rgba(52,211,153,0.1)] bg-[var(--accent-emerald)]/[0.02]' : ''}`}>
+    <div className={`driver-card ${isNext ? 'driver-card-next' : ''}`}>
       {/* Position number */}
-      <div className="driver-position">
+      <div className={`driver-position ${isNext ? 'driver-position-next' : ''}`}>
         <span>{position}</span>
       </div>
 
       {/* Avatar */}
-      <div className="avatar">
+      <div className={`avatar ${isNext ? 'avatar-next' : ''}`}>
         <span>{initials}</span>
       </div>
 
@@ -63,14 +70,14 @@ const DriverCard = memo(function DriverCard({
       <div className="info flex justify-between items-center w-full gap-4">
         <div className="flex-1 min-w-0">
           <h3 className="truncate mb-1">{driver.name}</h3>
-        <div className="meta">
-          <span className="meta-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            {time}
-          </span>
+          <div className="meta">
+            <span className="meta-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              {time}
+            </span>
             <span className="meta-item time-ago shrink-0">
               {timeAgo}
             </span>
@@ -79,20 +86,16 @@ const DriverCard = memo(function DriverCard({
 
         {/* Status Badge */}
         <div className="shrink-0">
-          {position === 1 ? (
-            <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/10 shadow-[0_0_20px_rgba(52,211,153,0.15)] relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--accent-emerald)]/20 to-transparent -translate-x-[200%] animate-[shimmer_3s_infinite]" />
-              <div className="w-2 h-2 rounded-full bg-[var(--accent-emerald)] animate-pulse shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
-              <span className="text-[11px] font-900 tracking-[0.2em] uppercase text-[var(--accent-emerald)] relative z-10">
-                Next Up
-              </span>
+          {isNext ? (
+            <div className="driver-badge driver-badge-next">
+              <div className="driver-badge-shimmer" />
+              <div className="driver-badge-dot driver-badge-dot-pulse" />
+              <span>{isArabic ? 'التالي' : 'Next Up'}</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border-subtle)] bg-white/[0.02]">
-              <div className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)]" />
-              <span className="text-[11px] font-800 tracking-[0.15em] uppercase text-[var(--text-muted)]">
-                Waiting
-              </span>
+            <div className="driver-badge driver-badge-waiting">
+              <div className="driver-badge-dot" />
+              <span>{isArabic ? 'في الانتظار' : 'Waiting'}</span>
             </div>
           )}
         </div>
@@ -113,6 +116,8 @@ export default function Dashboard() {
   const [, forceRender] = useState(0);
   const qrRef = useRef<string>('/api/qr');
   const router = useRouter();
+
+  const isArabic = office ? ['QCA1', 'QCA2', 'QCA3'].includes(office) : false;
 
   // Check auth on mount
   useEffect(() => {
@@ -341,6 +346,7 @@ export default function Dashboard() {
                   <DriverCard
                     driver={driver}
                     position={index + 1}
+                    isArabic={isArabic}
                   />
                 </div>
               ))}

@@ -36,6 +36,30 @@ export async function GET(request: Request) {
       return NextResponse.json({ registered: false });
     }
 
+    // If driver is waiting, calculate their position
+    if (data.status === 'waiting') {
+      const { count: total } = await supabase
+        .from('drivers')
+        .select('*', { count: 'exact', head: true })
+        .eq('office_id', officeId)
+        .eq('status', 'waiting');
+
+      const { count: ahead } = await supabase
+        .from('drivers')
+        .select('*', { count: 'exact', head: true })
+        .eq('office_id', officeId)
+        .eq('status', 'waiting')
+        .lt('scanned_at', data.scanned_at);
+
+      return NextResponse.json({
+        registered: true,
+        status: data.status,
+        driver: data,
+        position: (ahead ?? 0) + 1,
+        total: total ?? 0,
+      });
+    }
+
     return NextResponse.json({
       registered: true,
       status: data.status,

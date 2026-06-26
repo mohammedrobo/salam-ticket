@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     // Check if this device is already registered for this office
     const { data: existingDevice } = await supabase
       .from('drivers')
-      .select('id, name, status')
+      .select('id, name, status, scanned_at')
       .eq('device_id', device_id)
       .eq('office_id', office_id)
       .order('scanned_at', { ascending: false })
@@ -84,18 +84,33 @@ export async function POST(request: Request) {
 
       // Same name — if still waiting, reject (already in queue)
       if (existingDevice.status === 'waiting') {
+        // Calculate current position for the already-in-queue driver
+        const { count: total } = await supabase
+          .from('drivers')
+          .select('*', { count: 'exact', head: true })
+          .eq('office_id', office_id)
+          .eq('status', 'waiting');
+
+        const { count: ahead } = await supabase
+          .from('drivers')
+          .select('*', { count: 'exact', head: true })
+          .eq('office_id', office_id)
+          .eq('status', 'waiting')
+          .lt('scanned_at', existingDevice.scanned_at);
+
         return NextResponse.json(
-          { error: 'already_in_queue', driver: existingDevice },
+          { error: 'already_in_queue', driver: existingDevice, position: (ahead ?? 0) + 1, total: total ?? 0 },
           { status: 409 }
         );
       }
 
-      // Was checked out — re-join: update status back to waiting
+      // Was checked out — re-join: update status back to waiting with fresh timestamp
+      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('drivers')
-        .update({ status: 'waiting' })
+        .update({ status: 'waiting', scanned_at: now })
         .eq('id', existingDevice.id)
-        .select('id, name, status, office_id')
+        .select('id, name, status, office_id, scanned_at')
         .single();
 
       if (error) {
@@ -103,7 +118,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      return NextResponse.json(data, { status: 200 });
+      // Calculate position for re-joining driver
+      const { count: total } = await supabase
+        .from('drivers')
+        .select('*', { count: 'exact', head: true })
+        .eq('office_id', office_id)
+        .eq('status', 'waiting');
+
+      const { count: ahead } = await supabase
+        .from('drivers')
+        .select('*', { count: 'exact', head: true })
+        .eq('office_id', office_id)
+        .eq('status', 'waiting')
+        .lt('scanned_at', now);
+
+      return NextResponse.json({ ...data, position: (ahead ?? 0) + 1, total: total ?? 0 }, { status: 200 });
     }
 
     // New device — check if name is already in queue (different device, same name)
@@ -122,18 +151,33 @@ export async function POST(request: Request) {
       );
     }
     
+    const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('drivers')
-      .insert({ name: name.trim(), office_id, device_id })
-      .select('id, name, status, office_id')
+      .insert({ name: name.trim(), office_id, device_id, scanned_at: now })
+      .select('id, name, status, office_id, scanned_at')
       .single();
 
     if (error) {
       console.error('POST driver error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    
-    return NextResponse.json(data, { status: 201 });
+
+    // Calculate position for new driver
+    const { count: total } = await supabase
+      .from('drivers')
+      .select('*', { count: 'exact', head: true })
+      .eq('office_id', office_id)
+      .eq('status', 'waiting');
+
+    const { count: ahead } = await supabase
+      .from('drivers')
+      .select('*', { count: 'exact', head: true })
+      .eq('office_id', office_id)
+      .eq('status', 'waiting')
+      .lt('scanned_at', now);
+
+    return NextResponse.json({ ...data, position: (ahead ?? 0) + 1, total: total ?? 0 }, { status: 201 });
   } catch (err) {
     console.error('POST driver exception:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
