@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Driver {
   id: number;
   name: string;
   scanned_at: string;
+  completed_at?: string;
   status: string;
   office_id: string;
 }
@@ -15,10 +16,12 @@ const DriverCard = memo(function DriverCard({
   driver,
   position,
   isArabic,
+  variant,
 }: {
   driver: Driver;
   position: number;
   isArabic?: boolean;
+  variant: 'waiting' | 'next' | 'done';
 }) {
   const initials = driver.name
     .split(' ')
@@ -52,24 +55,38 @@ const DriverCard = memo(function DriverCard({
     }
   }
 
-  const isNext = position === 1;
+  // How long since completion (for Done cards)
+  const completedTimeAgo = useMemo(() => {
+    if (!driver.completed_at) return '';
+    const completedMs = new Date(driver.completed_at + 'Z').getTime();
+    const diffSec = Math.floor((now - completedMs) / 1000);
+    if (diffSec < 60) return isArabic ? 'الآن' : 'Just now';
+    const mins = Math.floor(diffSec / 60);
+    return isArabic ? `منذ ${mins}د` : `${mins}m ago`;
+  }, [driver.completed_at, now, isArabic]);
 
   return (
-    <div className={`driver-card ${isNext ? 'driver-card-next' : ''}`}>
+    <div className={`driver-card ${variant === 'next' ? 'driver-card-next' : ''} ${variant === 'done' ? 'driver-card-done' : ''}`}>
       {/* Position number */}
-      <div className={`driver-position ${isNext ? 'driver-position-next' : ''}`}>
-        <span>{position}</span>
+      <div className={`driver-position ${variant === 'next' ? 'driver-position-next' : ''} ${variant === 'done' ? 'driver-position-done' : ''}`}>
+        {variant === 'done' ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        ) : (
+          <span>{position}</span>
+        )}
       </div>
 
       {/* Avatar */}
-      <div className={`avatar ${isNext ? 'avatar-next' : ''}`}>
+      <div className={`avatar ${variant === 'next' ? 'avatar-next' : ''} ${variant === 'done' ? 'avatar-done' : ''}`}>
         <span>{initials}</span>
       </div>
 
       {/* Info */}
       <div className="info flex justify-between items-center w-full gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="truncate mb-1">{driver.name}</h3>
+          <h3 className={`truncate mb-1 ${variant === 'done' ? 'text-[var(--text-muted)]' : ''}`}>{driver.name}</h3>
           <div className="meta">
             <span className="meta-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -86,11 +103,19 @@ const DriverCard = memo(function DriverCard({
 
         {/* Status Badge */}
         <div className="shrink-0">
-          {isNext ? (
+          {variant === 'next' ? (
             <div className="driver-badge driver-badge-next">
               <div className="driver-badge-shimmer" />
               <div className="driver-badge-dot driver-badge-dot-pulse" />
               <span>{isArabic ? 'التالي' : 'Next Up'}</span>
+            </div>
+          ) : variant === 'done' ? (
+            <div className="driver-badge driver-badge-done">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>{isArabic ? 'تم' : 'Done'}</span>
+              {completedTimeAgo && <span className="driver-badge-time">{completedTimeAgo}</span>}
             </div>
           ) : (
             <div className="driver-badge driver-badge-waiting">
@@ -109,7 +134,8 @@ const SkeletonCard = memo(function SkeletonCard() {
 });
 
 export default function Dashboard() {
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [waiting, setWaiting] = useState<Driver[]>([]);
+  const [completed, setCompleted] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [office, setOffice] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -149,13 +175,21 @@ export default function Dashboard() {
 
   const fetchDrivers = useCallback(async () => {
     try {
-      const res = await fetch('/api/drivers');
+      const res = await fetch('/api/drivers?include_completed=true');
       if (res.status === 401) {
         router.push('/login');
         return;
       }
       const data = await res.json();
-      setDrivers(data);
+      // New format: { waiting: [...], completed: [...] }
+      if (Array.isArray(data)) {
+        // Fallback for old format
+        setWaiting(data);
+        setCompleted([]);
+      } else {
+        setWaiting(data.waiting || []);
+        setCompleted(data.completed || []);
+      }
     } catch {
       // retry on next interval
     } finally {
@@ -176,6 +210,8 @@ export default function Dashboard() {
       forceRender((n) => n + 1);
     }
   }, [office]);
+
+  const totalActive = waiting.length + completed.length;
 
   if (!authChecked) {
     return (
@@ -233,7 +269,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main content — bolder layout */}
+      {/* Main content */}
       <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col lg:flex-row gap-12 p-8 relative z-10">
         {/* LEFT: QR Panel */}
         <div className="qr-panel rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br from-[var(--bg-elevated)] to-[var(--bg-surface)] border border-[var(--border-subtle)] animate-slide-left relative">
@@ -277,26 +313,23 @@ export default function Dashboard() {
             </a>
           </div>
 
-          {/* Quick stats in sidebar */}
+          {/* Quick stats */}
           <div className="flex items-center gap-12 mt-8 p-6 glass rounded-2xl animate-fade-in-up delay-4 relative z-10">
             <div className="text-left">
               <p className="text-[var(--text-ghost)] text-[var(--text-xs)] uppercase tracking-[0.2em] font-bold mb-2">
-                Active Drivers
+                {isArabic ? 'في الطابور' : 'In Queue'}
               </p>
               <p className="font-display text-[var(--text-5xl)] font-800 tracking-[-0.05em] leading-none text-[var(--text-primary)]">
-                {drivers.length}
+                {waiting.length}
               </p>
             </div>
             <div className="w-px h-16 bg-[var(--border-subtle)]" />
             <div className="text-left">
               <p className="text-[var(--text-ghost)] text-[var(--text-xs)] uppercase tracking-[0.2em] font-bold mb-2">
-                Queue Status
+                {isArabic ? 'تم اليوم' : 'Done Today'}
               </p>
               <p className="font-display text-[var(--text-5xl)] font-800 tracking-[-0.05em] leading-none text-[var(--accent-emerald)]">
-                {drivers.length > 0 ? '●' : '○'}
-              </p>
-              <p className="text-[var(--text-ghost)] text-[11px] uppercase tracking-widest font-semibold mt-1">
-                Queue
+                {completed.length}
               </p>
             </div>
           </div>
@@ -304,9 +337,19 @@ export default function Dashboard() {
 
         {/* RIGHT: Driver List */}
         <div className="driver-list-panel flex-1 bg-[var(--bg-surface)]/40 rounded-3xl border border-[var(--border-subtle)] backdrop-blur-md">
+          {/* Queue Header */}
           <div className="driver-list-header animate-fade-in-up delay-1 border-b border-[var(--border-subtle)] pb-8 mb-8">
-            <h2 className="text-[var(--text-4xl)] uppercase font-900 tracking-[-0.05em]">Queue</h2>
-            <span className="count bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] px-4 py-2 rounded-full text-[var(--text-sm)] uppercase tracking-widest">{drivers.length} waiting</span>
+            <h2 className="text-[var(--text-4xl)] uppercase font-900 tracking-[-0.05em]">{isArabic ? 'الطابور' : 'Queue'}</h2>
+            <div className="flex items-center gap-3">
+              {completed.length > 0 && (
+                <span className="driver-count-badge driver-count-done">
+                  {completed.length} {isArabic ? 'تم' : 'done'}
+                </span>
+              )}
+              <span className="driver-count-badge driver-count-waiting">
+                {waiting.length} {isArabic ? 'في الانتظار' : 'waiting'}
+              </span>
+            </div>
           </div>
 
           {loading ? (
@@ -316,7 +359,7 @@ export default function Dashboard() {
               <SkeletonCard />
               <SkeletonCard />
             </div>
-          ) : drivers.length === 0 ? (
+          ) : totalActive === 0 ? (
             <div className="empty-state animate-scale-in">
               <div className="empty-icon">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5">
@@ -326,15 +369,17 @@ export default function Dashboard() {
                   <line x1="22" y1="11" x2="16" y2="11" />
                 </svg>
               </div>
-              <h2>No Drivers Waiting</h2>
+              <h2>{isArabic ? 'لا يوجد سائقين' : 'No Drivers Yet'}</h2>
               <p>
-                Drivers will appear here in real-time after they scan the QR code
-                and check in with their name.
+                {isArabic
+                  ? 'سيظهر السائقون هنا في الوقت الفعلي بعد مسح رمز QR والتسجيل'
+                  : 'Drivers will appear here in real-time after they scan the QR code and check in with their name.'}
               </p>
             </div>
           ) : (
             <div className="driver-list">
-              {drivers.map((driver, index) => (
+              {/* Waiting drivers */}
+              {waiting.map((driver, index) => (
                 <div
                   key={driver.id}
                   style={{
@@ -347,9 +392,42 @@ export default function Dashboard() {
                     driver={driver}
                     position={index + 1}
                     isArabic={isArabic}
+                    variant={index === 0 ? 'next' : 'waiting'}
                   />
                 </div>
               ))}
+
+              {/* Completed drivers section */}
+              {completed.length > 0 && (
+                <>
+                  {waiting.length > 0 && (
+                    <div className="driver-section-divider">
+                      <div className="driver-section-divider-line" />
+                      <span className="driver-section-divider-text">
+                        {isArabic ? 'تم الإتمام' : 'Completed'}
+                      </span>
+                      <div className="driver-section-divider-line" />
+                    </div>
+                  )}
+                  {completed.map((driver, index) => (
+                    <div
+                      key={driver.id}
+                      style={{
+                        animationDelay: `${(waiting.length + index) * 0.06}s`,
+                        animation: 'fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+                        opacity: 0,
+                      }}
+                    >
+                      <DriverCard
+                        driver={driver}
+                        position={0}
+                        isArabic={isArabic}
+                        variant="done"
+                      />
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>

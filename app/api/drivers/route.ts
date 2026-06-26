@@ -10,7 +10,7 @@ async function getOfficeId(): Promise<string | null> {
   return session.value;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const officeId = await getOfficeId();
     if (!officeId) {
@@ -18,20 +18,59 @@ export async function GET() {
     }
 
     const supabase = getSupabase();
-    
-    const { data, error } = await supabase
+    const { searchParams } = new URL(request.url);
+    const includeCompleted = searchParams.get('include_completed') === 'true';
+
+    // Always fetch waiting drivers
+    const { data: waitingData, error: waitingError } = await supabase
       .from('drivers')
       .select('*')
       .eq('office_id', officeId)
       .eq('status', 'waiting')
       .order('scanned_at', { ascending: true });
 
-    if (error) {
-      console.error('GET drivers error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (waitingError) {
+      console.error('GET drivers error:', waitingError);
+      return NextResponse.json({ error: waitingError.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    // If dashboard requests it, also fetch recently completed drivers
+    if (includeCompleted) {
+      // Try with completed_at first, fall back to all checked_out
+      let completedData: Record<string, unknown>[] | null = null;
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+      const { data, error: completedError } = await supabase
+        .from('drivers')
+        .select('*')
+        .eq('office_id', officeId)
+        .eq('status', 'checked_out')
+        .gte('completed_at', fiveMinAgo)
+        .order('completed_at', { ascending: false });
+
+      if (completedError && completedError.message?.includes('completed_at')) {
+        // completed_at column doesn't exist, fetch all checked_out from last hour
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const { data: fallbackData } = await supabase
+          .from('drivers')
+          .select('*')
+          .eq('office_id', officeId)
+          .eq('status', 'checked_out')
+          .gte('scanned_at', oneHourAgo)
+          .order('scanned_at', { ascending: false });
+        completedData = fallbackData;
+      } else {
+        completedData = data;
+      }
+
+      return NextResponse.json({
+        waiting: waitingData || [],
+        completed: completedData || [],
+      });
+    }
+
+    // Scan page expects a plain array
+    return NextResponse.json(waitingData || []);
   } catch (err) {
     console.error('GET drivers exception:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
@@ -202,11 +241,20 @@ export async function DELETE(request: Request) {
     
     const { error } = await supabase
       .from('drivers')
-      .update({ status: 'checked_out' })
+      .update({ status: 'checked_out', completed_at: new Date().toISOString() })
       .eq('id', parseInt(id))
       .eq('office_id', officeId);
 
-    if (error) {
+    // If completed_at column doesn't exist, retry without it
+    if (error && error.message?.includes('completed_at')) {
+      await supabase
+        .from('drivers')
+        .update({ status: 'checked_out' })
+        .eq('id', parseInt(id))
+        .eq('office_id', officeId);
+    }
+
+    if (error && !error.message?.includes('completed_at')) {
       console.error('DELETE driver error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }

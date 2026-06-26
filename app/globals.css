@@ -742,6 +742,120 @@ body::before {
   opacity: 0.6;
 }
 
+/* Done Badge */
+.driver-badge-done {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.15);
+  background: rgba(52, 211, 153, 0.05);
+  color: var(--accent-emerald);
+}
+
+.driver-badge-done svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.driver-badge-done span {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-emerald);
+  opacity: 0.8;
+}
+
+.driver-badge-time {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.05em !important;
+  opacity: 0.5 !important;
+  text-transform: none !important;
+}
+
+/* Done card variant */
+.driver-card-done {
+  opacity: 0.55;
+  border-color: rgba(52, 211, 153, 0.06);
+}
+
+.driver-card-done:hover {
+  opacity: 0.7;
+}
+
+.driver-position-done {
+  background: rgba(52, 211, 153, 0.06);
+  border-color: rgba(52, 211, 153, 0.12);
+  color: var(--accent-emerald);
+}
+
+.driver-position-done svg {
+  opacity: 0.7;
+}
+
+.avatar-done {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.3) 0%, rgba(52, 211, 153, 0.1) 100%);
+  box-shadow: none;
+}
+
+.avatar-done span {
+  color: var(--accent-emerald);
+  opacity: 0.6;
+}
+
+/* Section Divider */
+.driver-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.driver-section-divider-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-subtle), transparent);
+}
+
+.driver-section-divider-text {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+  white-space: nowrap;
+}
+
+/* Count Badges */
+.driver-count-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.driver-count-waiting {
+  background: rgba(77, 141, 255, 0.1);
+  color: var(--accent-blue);
+}
+
+.driver-count-done {
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--accent-emerald);
+}
+
 /* ========================================
    BUTTONS
    ======================================== */
