@@ -59,8 +59,7 @@ const t = (office: string) => {
       : `Position ${p} of ${total}`,
     nextUp: ar ? 'التالي' : 'Next up',
     waiting: ar ? 'في الانتظار' : 'Waiting',
-    complete: ar ? 'إتمام' : 'Complete',
-    finishing: ar ? 'جاري الإتمام...' : 'Finishing...',
+
     networkError: ar ? 'خطأ في الاتصال — تحقق من اتصالك' : 'Network error — check your connection',
     nameRequired: ar ? 'يرجى إدخال اسمك' : 'Please enter your name',
     deviceMismatch: (name: string) => ar
@@ -90,7 +89,7 @@ function ScanContent() {
   const [welcomeBack, setWelcomeBack] = useState(false);
   const [registeredName, setRegisteredName] = useState('');
   const [driverId, setDriverId] = useState<number | null>(null);
-  const [isFinishing, setIsFinishing] = useState(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const driverNameRef = useRef<string>('');
   const deviceIdRef = useRef<string>('');
@@ -272,28 +271,6 @@ function ScanContent() {
     setName(e.target.value);
     setError('');
   }, []);
-
-  const handleFinish = useCallback(async () => {
-    if (!driverId) return;
-    setIsFinishing(true);
-    try {
-      const res = await fetch(`/api/drivers?id=${driverId}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setSubmitted(false);
-        setCheckedOut(false);
-        setPosition(null);
-        setTotal(0);
-        setRegisteredName(driverNameRef.current);
-        setWelcomeBack(true);
-      }
-    } catch {
-      // keep user on position screen
-    } finally {
-      setIsFinishing(false);
-    }
-  }, [driverId]);
 
   const handleDismiss = useCallback(async () => {
     if (driverId) {
@@ -491,33 +468,7 @@ function ScanContent() {
                   </div>
                 )}
 
-                {/* Complete Button - for next in line */}
-                {isNext && (
-                  <button
-                    onClick={handleFinish}
-                    disabled={isFinishing}
-                    className="scan-cta-button scan-cta-green"
-                  >
-                    <div className="scan-cta-glow" />
-                    <div className="scan-cta-inner">
-                      {isFinishing ? (
-                        <>
-                          <svg className="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                          </svg>
-                          <span>{lang.finishing}</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                          <span>{lang.complete}</span>
-                        </>
-                      )}
-                    </div>
-                  </button>
-                )}
+
 
                 {/* Office Badge */}
                 <div className="scan-office-badge">

@@ -17,11 +17,15 @@ const DriverCard = memo(function DriverCard({
   position,
   isArabic,
   variant,
+  onDone,
+  isCompleting,
 }: {
   driver: Driver;
   position: number;
   isArabic?: boolean;
   variant: 'waiting' | 'next' | 'done';
+  onDone?: () => void;
+  isCompleting?: boolean;
 }) {
   const initials = driver.name
     .split(' ')
@@ -102,13 +106,31 @@ const DriverCard = memo(function DriverCard({
         </div>
 
         {/* Status Badge */}
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-2">
           {variant === 'next' ? (
-            <div className="driver-badge driver-badge-next">
-              <div className="driver-badge-shimmer" />
-              <div className="driver-badge-dot driver-badge-dot-pulse" />
-              <span>{isArabic ? 'التالي' : 'Next Up'}</span>
-            </div>
+            <>
+              <div className="driver-badge driver-badge-next">
+                <div className="driver-badge-shimmer" />
+                <div className="driver-badge-dot driver-badge-dot-pulse" />
+                <span>{isArabic ? 'التالي' : 'Next Up'}</span>
+              </div>
+              <button
+                onClick={onDone}
+                disabled={isCompleting}
+                className="driver-done-btn"
+              >
+                {isCompleting ? (
+                  <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+                <span>{isArabic ? 'تم' : 'Done'}</span>
+              </button>
+            </>
           ) : variant === 'done' ? (
             <div className="driver-badge driver-badge-done">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -210,6 +232,20 @@ export default function Dashboard() {
       forceRender((n) => n + 1);
     }
   }, [office]);
+
+  const [completingId, setCompletingId] = useState<number | null>(null);
+
+  const handleDone = useCallback(async (driverId: number) => {
+    setCompletingId(driverId);
+    try {
+      await fetch(`/api/drivers?id=${driverId}`, { method: 'DELETE' });
+      fetchDrivers();
+    } catch {
+      // retry on next interval
+    } finally {
+      setCompletingId(null);
+    }
+  }, [fetchDrivers]);
 
   const totalActive = waiting.length + completed.length;
 
@@ -393,6 +429,8 @@ export default function Dashboard() {
                     position={index + 1}
                     isArabic={isArabic}
                     variant={index === 0 ? 'next' : 'waiting'}
+                    onDone={index === 0 ? () => handleDone(driver.id) : undefined}
+                    isCompleting={completingId === driver.id}
                   />
                 </div>
               ))}

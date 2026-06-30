@@ -727,6 +727,48 @@ body::before {
   animation: pulse 2s ease-in-out infinite;
 }
 
+/* Done Button (Manager) */
+.driver-done-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--accent-emerald);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.driver-done-btn:hover {
+  background: rgba(52, 211, 153, 0.25);
+  border-color: rgba(52, 211, 153, 0.6);
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.2);
+}
+
+.driver-done-btn:active {
+  transform: scale(0.96);
+}
+
+.driver-done-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.driver-done-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 /* Waiting Badge */
 .driver-badge-waiting {
   border: 1px solid var(--border-subtle);
