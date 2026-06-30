@@ -285,13 +285,27 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Header right — office name + system status */}
+            {/* Header right — office name + sign out + system status */}
             <div className="flex items-center gap-6 animate-fade-in-up delay-2">
               <div className="glass rounded-xl px-5 py-2.5 flex items-center gap-3">
                 <span className="font-display text-[var(--text-lg)] font-800 tracking-[-0.02em] text-[var(--text-primary)]">
                   {office}
                 </span>
               </div>
+              <button
+                onClick={async () => {
+                  await fetch('/api/auth/logout', { method: 'POST' });
+                  router.push('/login');
+                }}
+                className="sign-out-btn"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span>{isArabic ? 'خروج' : 'Sign Out'}</span>
+              </button>
               <div className="flex items-center gap-3">
                 <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent-emerald)] relative">
                   <span className="absolute inset-[-6px] rounded-full bg-[var(--accent-emerald)] opacity-30 animate-pulse" />
