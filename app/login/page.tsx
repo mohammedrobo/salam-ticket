@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -8,12 +8,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   useEffect(() => {
-    setMounted(true);
     setTimeout(() => inputRef.current?.focus(), 600);
   }, []);
 
@@ -52,12 +55,26 @@ export default function LoginPage() {
     }
   }, [office, password, router]);
 
+  const handleRipple = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const button = e.currentTarget;
+    const rect = button.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const size = Math.max(rect.width, rect.height) * 2;
+    const ripple = document.createElement('span');
+    ripple.className = 'ripple-effect';
+    ripple.style.width = `${size}px`;
+    ripple.style.height = `${size}px`;
+    ripple.style.left = `${x - size / 2}px`;
+    ripple.style.top = `${y - size / 2}px`;
+    button.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 600);
+  }, []);
+
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Deep dark background */}
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden mesh-gradient-animated" style={{ background: 'var(--bg-primary)' }}>
       <div className="absolute inset-0 bg-[#06060a]" />
 
-      {/* Atmospheric gradient orbs */}
       <div className="absolute top-[-10%] left-[-5%] w-[700px] h-[700px] rounded-full animate-float" style={{
         background: 'radial-gradient(circle, rgba(77, 141, 255, 0.025) 0%, transparent 70%)',
         filter: 'blur(100px)'
@@ -68,7 +85,6 @@ export default function LoginPage() {
         animationDelay: '2s'
       }} />
 
-      {/* Grid pattern overlay */}
       <div className="absolute inset-0 opacity-[0.015]" style={{
         backgroundImage: `
           linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
@@ -77,9 +93,7 @@ export default function LoginPage() {
         backgroundSize: '80px 80px'
       }} />
 
-      {/* Main content */}
       <div className="relative z-10 w-full max-w-[420px] px-8">
-        {/* Logo / Brand mark */}
         <div className={`text-center mb-12 transition-all duration-700 delay-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
           <div className="mx-auto mb-6 brand-mark">
             <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center relative" style={{
@@ -106,20 +120,18 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Form card */}
         <div className={`transition-all duration-700 delay-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
           <div className="relative">
             <div className="absolute -inset-px rounded-3xl opacity-50 pointer-events-none" style={{
               background: 'radial-gradient(ellipse at 50% 0%, rgba(77, 141, 255, 0.04) 0%, transparent 60%)'
             }} />
 
-            <div className="glass-luxury rounded-3xl px-10 py-10 relative">
+            <div className="glass-luxury glass-hover rounded-3xl px-10 py-10 relative">
               <div className="absolute top-0 left-10 right-10 h-px" style={{
                 background: 'linear-gradient(90deg, transparent, rgba(77, 141, 255, 0.12), transparent)'
               }} />
 
               <form onSubmit={handleSubmit}>
-                {/* Office field */}
                 <div className="mb-6">
                   <label className="block text-[11px] font-semibold mb-3 tracking-[0.15em] uppercase" style={{ color: 'var(--text-ghost)' }}>
                     Office
@@ -141,7 +153,6 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Password field */}
                 <div className="mb-8">
                   <label className="block text-[11px] font-semibold mb-3 tracking-[0.15em] uppercase" style={{ color: 'var(--text-ghost)' }}>
                     Password
@@ -162,9 +173,8 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Error */}
                 {error && (
-                  <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-xl animate-fade-in" style={{
+                  <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-xl animate-fade-in animate-shake" style={{
                     background: 'rgba(255, 107, 107, 0.06)',
                     border: '1px solid rgba(255, 107, 107, 0.1)'
                   }}>
@@ -177,15 +187,15 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                {/* Submit button */}
                 <button
                   type="submit"
                   disabled={isSubmitting || !office.trim() || !password.trim()}
-                  className="w-full py-4 rounded-xl font-display font-bold text-[15px] tracking-[-0.01em] text-white transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="w-full py-4 rounded-xl font-display font-bold text-[15px] tracking-[-0.01em] text-white transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed ripple-container"
                   style={{
                     background: 'linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-dim) 100%)',
                     boxShadow: '0 2px 8px rgba(77, 141, 255, 0.2)'
                   }}
+                  onClick={handleRipple}
                 >
                   {isSubmitting ? (
                     <span className="flex items-center justify-center gap-3">

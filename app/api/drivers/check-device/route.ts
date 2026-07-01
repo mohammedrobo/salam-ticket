@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from('drivers')
-      .select('id, name, status, scanned_at')
+      .select('id, name, status, scanned_at, break_started_at')
       .eq('device_id', deviceId)
       .eq('office_id', officeId)
       .order('scanned_at', { ascending: false })
@@ -57,6 +57,39 @@ export async function GET(request: Request) {
         driver: data,
         position: (ahead ?? 0) + 1,
         total: total ?? 0,
+      });
+    }
+
+    // If driver is on_break, calculate their position among waiting drivers
+    if (data.status === 'on_break') {
+      const { count: total } = await supabase
+        .from('drivers')
+        .select('*', { count: 'exact', head: true })
+        .eq('office_id', officeId)
+        .eq('status', 'waiting');
+
+      const { count: ahead } = await supabase
+        .from('drivers')
+        .select('*', { count: 'exact', head: true })
+        .eq('office_id', officeId)
+        .eq('status', 'waiting')
+        .lt('scanned_at', data.scanned_at);
+
+      // Calculate break time remaining
+      const breakStartedAt = data.break_started_at ? new Date(data.break_started_at).getTime() : 0;
+      const breakDurationMs = 60 * 60 * 1000; // 1 hour
+      const breakEndsAt = breakStartedAt + breakDurationMs;
+      const now = Date.now();
+      const breakRemainingMs = Math.max(0, breakEndsAt - now);
+
+      return NextResponse.json({
+        registered: true,
+        status: data.status,
+        driver: data,
+        position: (ahead ?? 0) + 1,
+        total: total ?? 0,
+        break_started_at: data.break_started_at,
+        break_remaining_ms: breakRemainingMs,
       });
     }
 

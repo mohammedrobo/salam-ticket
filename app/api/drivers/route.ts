@@ -21,6 +21,31 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const includeCompleted = searchParams.get('include_completed') === 'true';
 
+    // Auto-return expired breaks: on_break drivers whose 1h break has elapsed
+    const breakDurationMs = 60 * 60 * 1000; // 1 hour
+    const { data: onBreakDrivers } = await supabase
+      .from('drivers')
+      .select('id, break_started_at')
+      .eq('office_id', officeId)
+      .eq('status', 'on_break');
+
+    if (onBreakDrivers && onBreakDrivers.length > 0) {
+      const now = Date.now();
+      for (const bd of onBreakDrivers) {
+        if (bd.break_started_at) {
+          const breakStart = new Date(bd.break_started_at).getTime();
+          if (now - breakStart >= breakDurationMs) {
+            // Break expired — return to waiting (keep original scanned_at)
+            await supabase
+              .from('drivers')
+              .update({ status: 'waiting', break_started_at: null })
+              .eq('id', bd.id)
+              .eq('office_id', officeId);
+          }
+        }
+      }
+    }
+
     // Always fetch waiting drivers
     const { data: waitingData, error: waitingError } = await supabase
       .from('drivers')
@@ -34,8 +59,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: waitingError.message }, { status: 500 });
     }
 
-    // If dashboard requests it, also fetch recently completed drivers
+    // If dashboard requests it, also fetch on_break and recently completed drivers
     if (includeCompleted) {
+      // Fetch on_break drivers
+      const { data: breakData } = await supabase
+        .from('drivers')
+        .select('*')
+        .eq('office_id', officeId)
+        .eq('status', 'on_break')
+        .order('break_started_at', { ascending: true });
+
       // Try with completed_at first, fall back to all checked_out
       let completedData: Record<string, unknown>[] | null = null;
       const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
@@ -65,12 +98,21 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         waiting: waitingData || [],
+        on_break: breakData || [],
         completed: completedData || [],
       });
     }
 
-    // Scan page expects a plain array
-    return NextResponse.json(waitingData || []);
+    // Scan page expects a plain array (includes waiting + on_break for position calc)
+    // Re-fetch waiting after potential break returns
+    const { data: finalWaiting } = await supabase
+      .from('drivers')
+      .select('*')
+      .eq('office_id', officeId)
+      .eq('status', 'waiting')
+      .order('scanned_at', { ascending: true });
+
+    return NextResponse.json(finalWaiting || []);
   } catch (err) {
     console.error('GET drivers exception:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
@@ -141,6 +183,36 @@ export async function POST(request: Request) {
           { error: 'already_in_queue', driver: existingDevice, position: (ahead ?? 0) + 1, total: total ?? 0 },
           { status: 409 }
         );
+      }
+
+      // On break — return them to queue at original position (keep scanned_at)
+      if (existingDevice.status === 'on_break') {
+        const { data, error } = await supabase
+          .from('drivers')
+          .update({ status: 'waiting', break_started_at: null })
+          .eq('id', existingDevice.id)
+          .select('id, name, status, office_id, scanned_at')
+          .single();
+
+        if (error) {
+          console.error('POST driver break-return error:', error);
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        const { count: total } = await supabase
+          .from('drivers')
+          .select('*', { count: 'exact', head: true })
+          .eq('office_id', office_id)
+          .eq('status', 'waiting');
+
+        const { count: ahead } = await supabase
+          .from('drivers')
+          .select('*', { count: 'exact', head: true })
+          .eq('office_id', office_id)
+          .eq('status', 'waiting')
+          .lt('scanned_at', data.scanned_at);
+
+        return NextResponse.json({ ...data, position: (ahead ?? 0) + 1, total: total ?? 0 }, { status: 200 });
       }
 
       // Was checked out — re-join: update status back to waiting with fresh timestamp

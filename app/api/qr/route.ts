@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   return new NextResponse(svg, {
     headers: {
       'Content-Type': 'image/svg+xml',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'public, max-age=31536000, immutable',
     },
   });
 }

@@ -15,6 +15,7 @@ const OFFICES: Record<string, Office> = {
   QCA5: { name: 'QCA5', passwordHash: hashPassword('mV8pJn3wKe') },
   QCC8: { name: 'QCC8', passwordHash: hashPassword('hM3nFc6dWa') },
   QCD7: { name: 'QCD7', passwordHash: hashPassword('pR7kXt4vQe') },
+  TEST: { name: 'TEST', passwordHash: hashPassword('test') },
 };
 
 export function authenticate(officeName: string, password: string): boolean {
