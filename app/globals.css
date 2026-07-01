@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Manrope:wght@300;400;500;600;700&family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=Syne:wght@400;500;600;700;800&family=Manrope:wght@300;400;500;600;700&family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@300;400;500;700&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -34,7 +34,8 @@
 
   /* Typography */
   --font-display: 'Syne', 'Cairo', system-ui, sans-serif;
-  --font-body: 'Manrope', 'Tajawal', system-ui, sans-serif;
+  --font-body: 'DM Sans', 'Tajawal', system-ui, sans-serif;
+  --font-editorial: 'Playfair Display', 'Cairo', Georgia, serif;
 
   /* Type scale — striking and bold */
   --text-xs: 0.75rem;
@@ -226,6 +227,187 @@ body::before {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.03) inset,
     0 8px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================
+   LOGIN PAGE — Editorial Brutalism
+   ======================================== */
+
+.glass-luxury {
+  background: linear-gradient(160deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.018) 40%, rgba(255,255,255,0.008) 100%);
+  backdrop-filter: blur(32px) saturate(140%);
+  -webkit-backdrop-filter: blur(32px) saturate(140%);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 8px 40px rgba(0,0,0,0.35),
+    0 0 0 1px rgba(0,0,0,0.12);
+  transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.glass-luxury:hover {
+  border-color: rgba(255,255,255,0.1);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.05) inset,
+    0 16px 56px rgba(0,0,0,0.45),
+    0 0 0 1px rgba(0,0,0,0.15);
+}
+
+.premium-input {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 18px 20px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.12) inset;
+  outline: none;
+}
+
+.premium-input:focus {
+  border-color: rgba(77, 141, 255, 0.35);
+  background: rgba(255,255,255,0.04);
+  box-shadow:
+    0 0 0 4px rgba(77, 141, 255, 0.06),
+    0 2px 4px rgba(0,0,0,0.12) inset;
+}
+
+.premium-input::placeholder {
+  color: var(--text-ghost);
+  font-weight: 300;
+}
+
+.brand-mark {
+  position: relative;
+}
+
+.brand-mark::after {
+  content: '';
+  position: absolute;
+  inset: -16px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(77, 141, 255, 0.06) 0%, transparent 70%);
+  animation: glowExpand 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Login split layout */
+.login-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+  position: relative;
+}
+
+@media (max-width: 900px) {
+  .login-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.login-hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 80px 64px;
+  position: relative;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .login-hero {
+    display: none;
+  }
+}
+
+.login-hero-title {
+  font-family: var(--font-editorial);
+  font-size: clamp(3rem, 6vw, 5.5rem);
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+  color: var(--text-primary);
+  margin-bottom: 32px;
+}
+
+.login-hero-title span {
+  display: block;
+  font-style: normal;
+  font-weight: 700;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: -0.06em;
+  font-size: 1.1em;
+}
+
+.login-hero-divider {
+  width: 48px;
+  height: 2px;
+  background: var(--accent-blue);
+  margin-bottom: 24px;
+}
+
+.login-hero-subtitle {
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text-muted);
+  max-width: 320px;
+  line-height: 1.7;
+}
+
+.login-hero-bg-text {
+  position: absolute;
+  bottom: -40px;
+  left: -20px;
+  font-family: var(--font-display);
+  font-size: clamp(8rem, 18vw, 16rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.06em;
+  line-height: 0.85;
+  color: rgba(255,255,255,0.015);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.login-form-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 32px;
+  position: relative;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 20%, rgba(77, 141, 255, 0.03) 0%, transparent 60%),
+    var(--bg-primary);
+}
+
+@media (max-width: 900px) {
+  .login-form-side {
+    min-height: 100vh;
+    padding: 32px 20px;
+  }
+}
+
+.login-form-side::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(180deg, transparent 10%, rgba(255,255,255,0.04) 50%, transparent 90%);
+}
+
+@media (max-width: 900px) {
+  .login-form-side::before {
+    display: none;
+  }
 }
 
 /* ========================================
@@ -2278,35 +2460,12 @@ body::before {
    PHASE 2: ADVANCED ANIMATION SYSTEM
    ======================================== */
 
-/* --- Animated Gradient Mesh --- */
-@keyframes meshShift {
-  0%, 100% { background-position: 0% 50%; }
-  25% { background-position: 50% 0%; }
-  50% { background-position: 100% 50%; }
-  75% { background-position: 50% 100%; }
-}
+/* --- Animated Gradient Mesh (removed — caused background color flicker) --- */
 
-.mesh-gradient-animated {
-  background-size: 200% 200%;
-  animation: meshShift 25s ease-in-out infinite;
-}
-
-/* --- Grain Drift --- */
-@keyframes grainDrift {
-  0%, 100% { transform: translate(0, 0); }
-  10% { transform: translate(-5%, -10%); }
-  20% { transform: translate(8%, 3%); }
-  30% { transform: translate(-3%, -15%); }
-  40% { transform: translate(12%, 9%); }
-  50% { transform: translate(-8%, 5%); }
-  60% { transform: translate(9%, -4%); }
-  70% { transform: translate(3%, 12%); }
-  80% { transform: translate(-12%, -8%); }
-  90% { transform: translate(-1%, 7%); }
-}
+/* --- Grain Drift (removed — caused background flicker) --- */
 
 body::before {
-  animation: grainDrift 8s steps(10) infinite;
+  /* grainDrift removed — caused continuous background flicker */
 }
 
 /* --- Button Ripple Effect --- */

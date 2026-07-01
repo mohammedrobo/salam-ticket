@@ -134,7 +134,7 @@ export default function Dashboard() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen mesh-gradient mesh-gradient-animated flex items-center justify-center">
+      <div className="min-h-screen mesh-gradient flex items-center justify-center">
         <div className="shimmer w-48 h-8 rounded-lg" />
       </div>
     );
@@ -143,7 +143,7 @@ export default function Dashboard() {
   if (!office) return null;
 
   return (
-    <div className="min-h-screen mesh-gradient mesh-gradient-animated flex flex-col">
+    <div className="min-h-screen mesh-gradient flex flex-col">
       {/* Command Bar */}
       <header className="command-bar">
         <div className="command-bar-inner">
