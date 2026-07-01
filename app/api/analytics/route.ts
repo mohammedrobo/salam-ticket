@@ -48,28 +48,75 @@ export async function GET(request: Request) {
       .eq('office_id', officeId)
       .gte('completed_at', periodStart.toISOString());
 
-    // --- All-time deliveries for these drivers ---
+    // --- All independent queries (no dependency on periodData) ---
+    const trendDays = 14;
+    const trendStart = new Date(now);
+    trendStart.setDate(trendStart.getDate() - (trendDays - 1));
+    trendStart.setHours(0, 0, 0, 0);
+
+    let prevStart: Date | undefined;
+    let prevEnd: Date | undefined;
+    if (period !== 'all') {
+      switch (period) {
+        case 'month': {
+          prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          prevEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+          break;
+        }
+        case 'week':
+        default: {
+          prevStart = new Date(periodStart);
+          prevStart.setDate(prevStart.getDate() - 7);
+          prevEnd = new Date(periodStart);
+          prevEnd.setMilliseconds(prevEnd.getMilliseconds() - 1);
+          break;
+        }
+      }
+    }
+
     const driverIds = [...new Set((periodData || []).map((d) => d.driver_account_id))];
 
-    let allTimeData: { driver_account_id: string; completed_at: string; duration_seconds: number }[] = [];
-    if (driverIds.length > 0) {
-      const { data } = await supabase
+    // --- Dependent + independent queries in parallel ---
+    const [
+      { data: allTimeData },
+      { data: driverAccounts },
+      { data: trendData },
+      { data: recentInactiveData },
+      { data: prevData },
+    ] = await Promise.all([
+      driverIds.length > 0
+        ? supabase
+            .from('delivery_history')
+            .select('driver_account_id, completed_at, duration_seconds')
+            .eq('office_id', officeId)
+            .in('driver_account_id', driverIds)
+        : Promise.resolve({ data: [] as { driver_account_id: string; completed_at: string; duration_seconds: number }[] }),
+      driverIds.length > 0
+        ? supabase
+            .from('driver_accounts')
+            .select('id, full_name, phone, created_at')
+            .in('id', driverIds)
+        : Promise.resolve({ data: [] as { id: string; full_name: string; phone: string; created_at: string }[] }),
+      supabase
         .from('delivery_history')
-        .select('driver_account_id, completed_at, duration_seconds')
+        .select('completed_at')
         .eq('office_id', officeId)
-        .in('driver_account_id', driverIds);
-      allTimeData = data || [];
-    }
-
-    // --- Fetch driver accounts ---
-    let driverAccounts: { id: string; full_name: string; phone: string; created_at: string }[] = [];
-    if (driverIds.length > 0) {
-      const { data } = await supabase
-        .from('driver_accounts')
-        .select('id, full_name, phone, created_at')
-        .in('id', driverIds);
-      driverAccounts = data || [];
-    }
+        .gte('completed_at', trendStart.toISOString()),
+      supabase
+        .from('delivery_history')
+        .select('driver_account_id, completed_at')
+        .eq('office_id', officeId)
+        .lt('completed_at', periodStart.toISOString())
+        .order('completed_at', { ascending: false }),
+      prevStart && prevEnd
+        ? supabase
+            .from('delivery_history')
+            .select('duration_seconds')
+            .eq('office_id', officeId)
+            .gte('completed_at', prevStart.toISOString())
+            .lte('completed_at', prevEnd.toISOString())
+        : Promise.resolve({ data: null }),
+    ]);
 
     // --- Compute per-driver stats ---
     const driverMap: Record<string, {
@@ -93,13 +140,13 @@ export async function GET(request: Request) {
     // All-time counts
     const allTimeCounts: Record<string, number> = {};
     const allTimeDurations: Record<string, number> = {};
-    for (const row of allTimeData) {
+    for (const row of allTimeData || []) {
       allTimeCounts[row.driver_account_id] = (allTimeCounts[row.driver_account_id] || 0) + 1;
       allTimeDurations[row.driver_account_id] = (allTimeDurations[row.driver_account_id] || 0) + (row.duration_seconds || 0);
     }
 
     // Build driver rows
-    const drivers = driverAccounts.map((account) => {
+    const drivers = (driverAccounts || []).map((account) => {
       const stats = driverMap[account.id];
       return {
         account,
@@ -117,17 +164,6 @@ export async function GET(request: Request) {
     drivers.sort((a, b) => b.period_deliveries - a.period_deliveries);
 
     // --- Daily trend (last 14 days) ---
-    const trendDays = 14;
-    const trendStart = new Date(now);
-    trendStart.setDate(trendStart.getDate() - (trendDays - 1));
-    trendStart.setHours(0, 0, 0, 0);
-
-    const { data: trendData } = await supabase
-      .from('delivery_history')
-      .select('completed_at')
-      .eq('office_id', officeId)
-      .gte('completed_at', trendStart.toISOString());
-
     const dailyTrend: { date: string; count: number }[] = [];
     const dailyMap: Record<string, number> = {};
     for (const row of trendData || []) {
@@ -150,12 +186,6 @@ export async function GET(request: Request) {
 
     // --- Inactive drivers (had deliveries before but none this period) ---
     const activeDriverIds = new Set(driverIds);
-    const { data: recentInactiveData } = await supabase
-      .from('delivery_history')
-      .select('driver_account_id, completed_at')
-      .eq('office_id', officeId)
-      .lt('completed_at', periodStart.toISOString())
-      .order('completed_at', { ascending: false });
 
     const inactiveMap: Record<string, string> = {};
     if (recentInactiveData) {
@@ -208,35 +238,12 @@ export async function GET(request: Request) {
       else slow++;
     }
 
-    // --- Previous period comparison ---
+    // --- Previous period comparison (from parallelized query) ---
     let prev_period_deliveries = 0;
     let prev_avg_duration = 0;
-    if (period !== 'all') {
-      let prevStart: Date;
-      let prevEnd: Date = new Date(periodStart);
-      switch (period) {
-        case 'month': {
-          prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          prevEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-          break;
-        }
-        case 'week':
-        default: {
-          prevStart = new Date(periodStart);
-          prevStart.setDate(prevStart.getDate() - 7);
-          prevEnd = new Date(periodStart);
-          prevEnd.setMilliseconds(prevEnd.getMilliseconds() - 1);
-          break;
-        }
-      }
-      const { data: prevData } = await supabase
-        .from('delivery_history')
-        .select('duration_seconds')
-        .eq('office_id', officeId)
-        .gte('completed_at', prevStart.toISOString())
-        .lte('completed_at', prevEnd.toISOString());
-      prev_period_deliveries = prevData?.length || 0;
-      if (prevData && prevData.length > 0) {
+    if (prevData) {
+      prev_period_deliveries = prevData.length;
+      if (prevData.length > 0) {
         prev_avg_duration = Math.round(prevData.reduce((s, d) => s + (d.duration_seconds || 0), 0) / prevData.length);
       }
     }

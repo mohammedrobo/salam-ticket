@@ -6,6 +6,7 @@ import { type Driver } from '@/lib/types';
 import DriverCard from '@/components/DriverCard';
 import SkeletonCard from '@/components/SkeletonCard';
 import { CountBadge } from '@/components/Badge';
+import CommandBar from '@/components/CommandBar';
 
 export default function Dashboard() {
   const [waiting, setWaiting] = useState<Driver[]>([]);
@@ -107,23 +108,6 @@ export default function Dashboard() {
     }
   }, [fetchDrivers]);
 
-  const handleRipple = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    const button = e.currentTarget;
-    const rect = button.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const size = Math.max(rect.width, rect.height) * 2;
-
-    const ripple = document.createElement('span');
-    ripple.className = 'ripple-effect';
-    ripple.style.width = `${size}px`;
-    ripple.style.height = `${size}px`;
-    ripple.style.left = `${x - size / 2}px`;
-    ripple.style.top = `${y - size / 2}px`;
-    button.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 600);
-  }, []);
-
   const totalActive = waiting.length + onBreak.length + completed.length;
 
   if (!authChecked) {
@@ -139,69 +123,39 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen mesh-gradient flex flex-col">
       {/* Command Bar */}
-      <header className="command-bar">
-        <div className="command-bar-inner">
-          <div className="command-wordmark animate-fade-in-up">
-            <span className="command-wordmark-name">Salam</span>
-            <span className="command-wordmark-label">Fleet Ops</span>
-          </div>
+      <CommandBar
+        label="Fleet Ops"
+        office={office}
+        showHeartbeat
+        isArabic={isArabic}
+      >
+        <a
+          href={`/qr?office=${office}`}
+          target="_blank"
+          className="command-signout ripple-container"
+          style={{ textDecoration: 'none' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+          </svg>
+          <span>{isArabic ? 'رمز QR' : 'QR Code'}</span>
+        </a>
 
-          <div className="command-actions animate-fade-in-up delay-2">
-            <div className="command-office">
-              <span className="command-office-dot" />
-              <span>{office}</span>
-            </div>
-
-            <a
-              href={`/qr?office=${office}`}
-              target="_blank"
-              className="command-signout ripple-container"
-              style={{ textDecoration: 'none' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" />
-                <rect x="14" y="3" width="7" height="7" />
-                <rect x="14" y="14" width="7" height="7" />
-                <rect x="3" y="14" width="7" height="7" />
-              </svg>
-              <span>{isArabic ? 'رمز QR' : 'QR Code'}</span>
-            </a>
-
-            <button
-              onClick={() => router.push('/analytics')}
-              className="command-signout ripple-container"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="20" x2="18" y2="10" />
-                <line x1="12" y1="20" x2="12" y2="4" />
-                <line x1="6" y1="20" x2="6" y2="14" />
-              </svg>
-              <span>{isArabic ? 'التحليلات' : 'Analytics'}</span>
-            </button>
-
-            <button
-              onClick={async () => {
-                await fetch('/api/auth/logout', { method: 'POST' });
-                router.push('/login');
-              }}
-              className="command-signout ripple-container"
-              onClickCapture={handleRipple}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              <span>{isArabic ? 'خروج' : 'Sign Out'}</span>
-            </button>
-
-            <div className="command-heartbeat">
-              <span className="command-heartbeat-dot" />
-              <span className="command-heartbeat-label">{isArabic ? ' متصل' : 'Online'}</span>
-            </div>
-          </div>
-        </div>
-      </header>
+        <button
+          onClick={() => router.push('/analytics')}
+          className="command-signout ripple-container"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg>
+          <span>{isArabic ? 'التحليلات' : 'Analytics'}</span>
+        </button>
+      </CommandBar>
 
       {/* Main content */}
       <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col gap-12 p-8 relative z-10">

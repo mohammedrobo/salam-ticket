@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import CommandBar from '@/components/CommandBar';
 
 interface DriverAccount {
   id: string;
@@ -40,28 +41,8 @@ interface AnalyticsData {
   drivers: DriverRow[];
 }
 
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const mins = Math.floor(seconds / 60);
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  return `${hrs}h ${remainMins}m`;
-}
-
-function timeAgo(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
+import AnimatedCounter from '@/components/AnimatedCounter';
+import { formatDuration, timeAgo } from '@/lib/utils';
 
 function formatDateShort(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
@@ -106,37 +87,6 @@ function exportCSV(drivers: DriverRow[]) {
   a.download = `drivers-${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-/* ── Animated Counter ── */
-function AnimatedCounter({ value, duration = 800 }: { value: number; duration?: number }) {
-  const [display, setDisplay] = useState(0);
-  const ref = useRef<number>(0);
-  const prevValue = useRef(0);
-
-  useEffect(() => {
-    const start = prevValue.current;
-    const end = value;
-    const startTime = performance.now();
-
-    function tick(now: number) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(start + (end - start) * eased);
-      setDisplay(current);
-      if (progress < 1) {
-        ref.current = requestAnimationFrame(tick);
-      } else {
-        prevValue.current = end;
-      }
-    }
-
-    ref.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(ref.current);
-  }, [value, duration]);
-
-  return <span className="analytics-counter">{display}</span>;
 }
 
 /* ── Period Delta Badge ── */
@@ -268,33 +218,14 @@ export default function AnalyticsPage() {
   return (
     <div className="min-h-screen mesh-gradient">
       {/* Header */}
-      <header className="command-bar">
-        <div className="command-bar-inner">
-          <div className="command-wordmark animate-fade-in-up">
-            <span className="command-wordmark-name">Salam</span>
-            <span className="command-wordmark-label">Analytics</span>
-          </div>
-          <div className="command-actions animate-fade-in-up delay-2">
-            <div className="command-office">
-              <span className="command-office-dot" />
-              <span>{office}</span>
-            </div>
-            <button onClick={() => router.push('/')} className="command-signout ripple-container">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 12H5" /><polyline points="12 19 5 12 12 5" />
-              </svg>
-              <span>{isArabic ? 'الطابور' : 'Queue'}</span>
-            </button>
-            <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); router.push('/login'); }} className="command-signout ripple-container">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              <span>{isArabic ? 'خروج' : 'Sign Out'}</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* Command Bar */}
+      <CommandBar
+        label="Analytics"
+        office={office}
+        backTo="/"
+        backLabel={isArabic ? 'الطابور' : 'Queue'}
+        isArabic={isArabic}
+      />
 
       <div className="max-w-[1400px] mx-auto px-8 py-10">
         {/* Toolbar: Period Tabs + Refresh + CSV + Search */}
@@ -365,7 +296,7 @@ export default function AnalyticsPage() {
               </svg>
             </div>
             <div className="analytics-stat-content">
-              <p className="analytics-stat-value"><AnimatedCounter value={data?.summary.total_drivers ?? 0} /></p>
+              <p className="analytics-stat-value"><AnimatedCounter value={data?.summary.total_drivers ?? 0} className="analytics-counter" /></p>
               <p className="analytics-stat-label">{isArabic ? 'سائق نشط' : 'Active Drivers'}</p>
             </div>
           </div>
@@ -378,7 +309,7 @@ export default function AnalyticsPage() {
               </svg>
             </div>
             <div className="analytics-stat-content">
-              <p className="analytics-stat-value analytics-stat-emerald"><AnimatedCounter value={data?.summary.period_deliveries ?? 0} /></p>
+              <p className="analytics-stat-value analytics-stat-emerald"><AnimatedCounter value={data?.summary.period_deliveries ?? 0} className="analytics-counter" /></p>
               <p className="analytics-stat-label">{isArabic ? 'توصيلات' : 'Deliveries'}</p>
               {data && period !== 'all' && (
                 <PeriodDelta current={data.summary.period_deliveries} previous={data.summary.prev_period_deliveries} />
@@ -393,7 +324,7 @@ export default function AnalyticsPage() {
               </svg>
             </div>
             <div className="analytics-stat-content">
-              <p className="analytics-stat-value analytics-stat-amber"><AnimatedCounter value={data?.summary.avg_per_driver ?? 0} /></p>
+              <p className="analytics-stat-value analytics-stat-amber"><AnimatedCounter value={data?.summary.avg_per_driver ?? 0} className="analytics-counter" /></p>
               <p className="analytics-stat-label">{isArabic ? 'متوسط / سائق' : 'Avg / Driver'}</p>
             </div>
           </div>
@@ -515,7 +446,7 @@ export default function AnalyticsPage() {
                 </svg>
               </div>
               <div>
-                <p className="analytics-insight-value"><AnimatedCounter value={data?.summary.first_timers ?? 0} /></p>
+                <p className="analytics-insight-value"><AnimatedCounter value={data?.summary.first_timers ?? 0} className="analytics-counter" /></p>
                 <p className="analytics-insight-label">{isArabic ? 'سائق جديد' : 'New Drivers'}</p>
               </div>
             </div>

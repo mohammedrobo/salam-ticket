@@ -198,18 +198,19 @@ export async function POST(request: Request) {
       }
 
       if (existingDevice.status === 'waiting') {
-        const { count: total } = await supabase
-          .from('drivers')
-          .select('*', { count: 'exact', head: true })
-          .eq('office_id', office_id)
-          .eq('status', 'waiting');
-
-        const { count: ahead } = await supabase
-          .from('drivers')
-          .select('*', { count: 'exact', head: true })
-          .eq('office_id', office_id)
-          .eq('status', 'waiting')
-          .lt('scanned_at', existingDevice.scanned_at);
+        const [{ count: total }, { count: ahead }] = await Promise.all([
+          supabase
+            .from('drivers')
+            .select('*', { count: 'exact', head: true })
+            .eq('office_id', office_id)
+            .eq('status', 'waiting'),
+          supabase
+            .from('drivers')
+            .select('*', { count: 'exact', head: true })
+            .eq('office_id', office_id)
+            .eq('status', 'waiting')
+            .lt('scanned_at', existingDevice.scanned_at),
+        ]);
 
         return NextResponse.json(
           { error: 'already_in_queue', driver: existingDevice, position: (ahead ?? 0) + 1, total: total ?? 0, driver_account_id: driverAccountId },
@@ -230,18 +231,19 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        const { count: total } = await supabase
-          .from('drivers')
-          .select('*', { count: 'exact', head: true })
-          .eq('office_id', office_id)
-          .eq('status', 'waiting');
-
-        const { count: ahead } = await supabase
-          .from('drivers')
-          .select('*', { count: 'exact', head: true })
-          .eq('office_id', office_id)
-          .eq('status', 'waiting')
-          .lt('scanned_at', data.scanned_at);
+        const [{ count: total }, { count: ahead }] = await Promise.all([
+          supabase
+            .from('drivers')
+            .select('*', { count: 'exact', head: true })
+            .eq('office_id', office_id)
+            .eq('status', 'waiting'),
+          supabase
+            .from('drivers')
+            .select('*', { count: 'exact', head: true })
+            .eq('office_id', office_id)
+            .eq('status', 'waiting')
+            .lt('scanned_at', data.scanned_at),
+        ]);
 
         return NextResponse.json({ ...data, position: (ahead ?? 0) + 1, total: total ?? 0, driver_account_id: driverAccountId }, { status: 200 });
       }
@@ -260,18 +262,19 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      const { count: total } = await supabase
-        .from('drivers')
-        .select('*', { count: 'exact', head: true })
-        .eq('office_id', office_id)
-        .eq('status', 'waiting');
-
-      const { count: ahead } = await supabase
-        .from('drivers')
-        .select('*', { count: 'exact', head: true })
-        .eq('office_id', office_id)
-        .eq('status', 'waiting')
-        .lt('scanned_at', now);
+      const [{ count: total }, { count: ahead }] = await Promise.all([
+        supabase
+          .from('drivers')
+          .select('*', { count: 'exact', head: true })
+          .eq('office_id', office_id)
+          .eq('status', 'waiting'),
+        supabase
+          .from('drivers')
+          .select('*', { count: 'exact', head: true })
+          .eq('office_id', office_id)
+          .eq('status', 'waiting')
+          .lt('scanned_at', now),
+      ]);
 
       return NextResponse.json({ ...data, position: (ahead ?? 0) + 1, total: total ?? 0, driver_account_id: driverAccountId }, { status: 200 });
     }
@@ -310,18 +313,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const { count: total } = await supabase
-      .from('drivers')
-      .select('*', { count: 'exact', head: true })
-      .eq('office_id', office_id)
-      .eq('status', 'waiting');
-
-    const { count: ahead } = await supabase
-      .from('drivers')
-      .select('*', { count: 'exact', head: true })
-      .eq('office_id', office_id)
-      .eq('status', 'waiting')
-      .lt('scanned_at', now);
+    const [{ count: total }, { count: ahead }] = await Promise.all([
+      supabase
+        .from('drivers')
+        .select('*', { count: 'exact', head: true })
+        .eq('office_id', office_id)
+        .eq('status', 'waiting'),
+      supabase
+        .from('drivers')
+        .select('*', { count: 'exact', head: true })
+        .eq('office_id', office_id)
+        .eq('status', 'waiting')
+        .lt('scanned_at', now),
+    ]);
 
     return NextResponse.json({ ...data, position: (ahead ?? 0) + 1, total: total ?? 0, driver_account_id: driverAccountId }, { status: 201 });
   } catch (err) {
