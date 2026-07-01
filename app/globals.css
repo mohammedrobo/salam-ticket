@@ -763,6 +763,7 @@ body::before {
   line-height: 1;
   color: var(--text-primary);
   text-transform: uppercase;
+  margin-top: 4px;
 }
 
 .command-wordmark-label {
