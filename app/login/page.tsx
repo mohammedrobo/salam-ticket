@@ -14,10 +14,33 @@ export default function LoginPage() {
     () => false,
   );
   const officeRef = useRef<HTMLInputElement>(null);
+  const formSideRef = useRef<HTMLDivElement>(null);
+  const orb1Ref = useRef<HTMLDivElement>(null);
+  const orb2Ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
-    setTimeout(() => officeRef.current?.focus(), 700);
+    setTimeout(() => officeRef.current?.focus(), 800);
+  }, []);
+
+  useEffect(() => {
+    const formSide = formSideRef.current;
+    if (!formSide) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = formSide.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width - 0.5;
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      if (orb1Ref.current) {
+        orb1Ref.current.style.transform = `translate(${x * -15}px, ${y * -15}px)`;
+      }
+      if (orb2Ref.current) {
+        orb2Ref.current.style.transform = `translate(${x * -8}px, ${y * -8}px)`;
+      }
+    };
+
+    formSide.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => formSide.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -55,214 +78,223 @@ export default function LoginPage() {
     }
   }, [office, password, router]);
 
-  const handleRipple = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    const button = e.currentTarget;
-    const rect = button.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const size = Math.max(rect.width, rect.height) * 2;
-    const ripple = document.createElement('span');
-    ripple.className = 'ripple-effect';
-    ripple.style.width = `${size}px`;
-    ripple.style.height = `${size}px`;
-    ripple.style.left = `${x - size / 2}px`;
-    ripple.style.top = `${y - size / 2}px`;
-    button.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 600);
-  }, []);
-
   return (
     <div className="login-split">
-      {/* ─── LEFT: Editorial Hero ─── */}
-      <div className="login-hero" style={{ background: 'var(--bg-primary)' }}>
-        {/* Floating orbs */}
-        <div className="absolute top-[-10%] left-[-5%] w-[600px] h-[600px] rounded-full" style={{
-          background: 'radial-gradient(circle, rgba(77, 141, 255, 0.04) 0%, transparent 70%)',
-          filter: 'blur(100px)',
-          animation: 'float 8s ease-in-out infinite'
-        }} />
-        <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] rounded-full" style={{
-          background: 'radial-gradient(circle, rgba(52, 211, 153, 0.025) 0%, transparent 70%)',
-          filter: 'blur(80px)',
-          animation: 'float 8s ease-in-out infinite 3s'
-        }} />
+      {/* ─── LEFT: Hero Panel ─── */}
+      <div className="login-hero">
+        {/* Atmospheric orbs */}
+        <div className="login-hero-orb-1" />
+        <div className="login-hero-orb-2" />
 
         {/* Ghosted background text */}
-        <div className="login-hero-bg-text">
-          FLEET
-        </div>
+        <div className="login-hero-bg-text">Fleet</div>
 
-        {/* Grid overlay */}
-        <div className="absolute inset-0 opacity-[0.015]" style={{
-          backgroundImage: `
-            linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)
-          `,
-          backgroundSize: '60px 60px',
-          pointerEvents: 'none'
-        }} />
+        {/* Bottom accent line */}
+        <div className="login-hero-accent-line" />
 
         {/* Content */}
-        <div className={`relative z-10 transition-all duration-1000 delay-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-          <div className="brand-mark mb-8">
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center relative" style={{
-              background: 'linear-gradient(135deg, rgba(77, 141, 255, 0.1) 0%, rgba(77, 141, 255, 0.03) 100%)',
-              border: '1px solid rgba(77, 141, 255, 0.12)'
-            }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-80">
+        <div
+          className="relative z-10"
+          style={{
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? 'none' : 'translateY(32px)',
+            transition: 'all 1s cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+        >
+          {/* Brand icon */}
+          <div className="login-brand-icon">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--warm-500)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="opacity-70"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+          </div>
+
+          {/* Title */}
+          <h1 className="login-hero-title">
+            Fleet
+            <span>Manager</span>
+          </h1>
+
+          {/* Divider */}
+          <div className="login-hero-divider" />
+
+          {/* Subtitle */}
+          <p className="login-hero-subtitle">
+            Real-time driver management and check-in system for your office
+            operations.
+          </p>
+        </div>
+      </div>
+
+      {/* ─── RIGHT: Login Form ─── */}
+      <div className="login-form-side" ref={formSideRef}>
+        {/* Ambient orb (parallax) */}
+        <div className="login-ambient-orb" ref={orb1Ref} />
+        <div
+          className="login-ambient-orb"
+          ref={orb2Ref}
+          style={{
+            top: 'auto',
+            bottom: '10%',
+            right: 'auto',
+            left: '-5%',
+            width: '350px',
+            height: '350px',
+          }}
+        />
+
+        {/* Panel divider */}
+        <div className="login-panel-divider" />
+
+        <div className="relative z-10 w-full" style={{ maxWidth: '420px' }}>
+          {/* Mobile-only brand */}
+          <div
+            className="login-mobile-brand lg:hidden"
+            style={{
+              opacity: mounted ? 1 : 0,
+              transform: mounted ? 'none' : 'translateY(20px)',
+              transition: 'all 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.1s',
+            }}
+          >
+            <div className="login-brand-icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--warm-500)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="opacity-70"
+              >
                 <rect x="3" y="3" width="7" height="7" />
                 <rect x="14" y="3" width="7" height="7" />
                 <rect x="14" y="14" width="7" height="7" />
                 <rect x="3" y="14" width="7" height="7" />
               </svg>
             </div>
-          </div>
-
-          <div className="login-hero-divider" />
-
-          <h1 className="login-hero-title">
-            Fleet
-            <span>Manager</span>
-          </h1>
-
-          <p className="login-hero-subtitle">
-            Real-time driver management and check-in system for your office operations.
-          </p>
-        </div>
-      </div>
-
-      {/* ─── RIGHT: Login Form ─── */}
-      <div className="login-form-side">
-        {/* Ambient orb */}
-        <div className="absolute top-[10%] right-[-5%] w-[400px] h-[400px] rounded-full" style={{
-          background: 'radial-gradient(circle, rgba(77, 141, 255, 0.03) 0%, transparent 70%)',
-          filter: 'blur(80px)',
-          animation: 'float 6s ease-in-out infinite 1s',
-          pointerEvents: 'none'
-        }} />
-
-        <div className="relative z-10 w-full max-w-[400px]">
-          {/* Mobile-only brand */}
-          <div className={`text-center mb-10 lg:hidden transition-all duration-700 delay-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-            <div className="mx-auto mb-5 brand-mark">
-              <div className="w-14 h-14 mx-auto rounded-xl flex items-center justify-center relative" style={{
-                background: 'linear-gradient(135deg, rgba(77, 141, 255, 0.12) 0%, rgba(77, 141, 255, 0.04) 100%)',
-                border: '1px solid rgba(77, 141, 255, 0.12)'
-              }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-80">
-                  <rect x="3" y="3" width="7" height="7" />
-                  <rect x="14" y="3" width="7" height="7" />
-                  <rect x="14" y="14" width="7" height="7" />
-                  <rect x="3" y="14" width="7" height="7" />
-                </svg>
-              </div>
-            </div>
-            <h1 className="font-display text-[28px] font-bold tracking-[-0.04em] mb-2" style={{ color: 'var(--text-primary)' }}>
-              Fleet Manager
-            </h1>
-            <p className="text-[14px]" style={{ color: 'var(--text-muted)' }}>
-              Sign in to your office
-            </p>
+            <h1>Fleet</h1>
+            <p>Sign in to your office</p>
           </div>
 
           {/* Form card */}
-          <div className={`transition-all duration-700 delay-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-            <div className="relative">
+          <div
+            style={{
+              opacity: mounted ? 1 : 0,
+              transform: mounted ? 'none' : 'translateY(24px)',
+              transition: 'all 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.25s',
+            }}
+          >
+            <div className="login-form-card">
               {/* Glow behind card */}
-              <div className="absolute -inset-4 rounded-3xl pointer-events-none" style={{
-                background: 'radial-gradient(ellipse at 50% 0%, rgba(77, 141, 255, 0.04) 0%, transparent 60%)',
-                opacity: 0.6
-              }} />
+              <div className="login-form-card-glow" />
 
-              <div className="glass-luxury rounded-3xl px-10 py-10 relative">
+              <div className="login-form-card-inner">
                 {/* Top accent line */}
-                <div className="absolute top-0 left-10 right-10 h-px" style={{
-                  background: 'linear-gradient(90deg, transparent, rgba(77, 141, 255, 0.15), transparent)'
-                }} />
+                <div className="login-form-card-topline" />
 
-                {/* Welcome text */}
-                <div className="mb-8">
-                  <p className="text-[11px] font-semibold tracking-[0.18em] uppercase mb-2" style={{ color: 'var(--text-ghost)' }}>
-                    Welcome back
-                  </p>
-                  <h2 className="font-display text-[22px] font-bold tracking-[-0.03em]" style={{ color: 'var(--text-primary)' }}>
-                    Sign in to continue
-                  </h2>
+                {/* Header */}
+                <div className="login-form-header">
+                  <p>Welcome back</p>
+                  <h2>Sign in to continue</h2>
                 </div>
 
                 <form onSubmit={handleSubmit}>
                   {/* Office field */}
-                  <div className="mb-5">
-                    <label className="block text-[11px] font-semibold mb-3 tracking-[0.15em] uppercase" style={{ color: 'var(--text-ghost)' }}>
-                      Office
-                    </label>
-                    <div className="relative group">
+                  <div className="login-field">
+                    <label>Office</label>
+                    <div className="login-field-wrapper">
                       <input
                         ref={officeRef}
                         type="text"
                         value={office}
-                        onChange={(e) => { setOffice(e.target.value); setError(''); }}
+                        onChange={(e) => {
+                          setOffice(e.target.value);
+                          setError('');
+                        }}
                         placeholder="QCA2"
-                        className="premium-input w-full"
+                        className="login-input"
                         autoComplete="organization"
                       />
-                      <div className="absolute inset-0 rounded-[14px] pointer-events-none transition-opacity duration-500 opacity-0 group-focus-within:opacity-100" style={{
-                        background: 'radial-gradient(ellipse at center, rgba(77, 141, 255, 0.04) 0%, transparent 70%)',
-                        transform: 'scale(1.5)'
-                      }} />
+                      <div className="login-input-line" />
+                      <div className="login-input-glow" />
                     </div>
                   </div>
 
                   {/* Password field */}
-                  <div className="mb-7">
-                    <label className="block text-[11px] font-semibold mb-3 tracking-[0.15em] uppercase" style={{ color: 'var(--text-ghost)' }}>
-                      Password
-                    </label>
-                    <div className="relative group">
+                  <div className="login-field">
+                    <label>Password</label>
+                    <div className="login-field-wrapper">
                       <input
                         type="password"
                         value={password}
-                        onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setError('');
+                        }}
                         placeholder="Enter password"
-                        className="premium-input w-full"
+                        className="login-input"
                         autoComplete="current-password"
                       />
-                      <div className="absolute inset-0 rounded-[14px] pointer-events-none transition-opacity duration-500 opacity-0 group-focus-within:opacity-100" style={{
-                        background: 'radial-gradient(ellipse at center, rgba(77, 141, 255, 0.04) 0%, transparent 70%)',
-                        transform: 'scale(1.5)'
-                      }} />
+                      <div className="login-input-line" />
+                      <div className="login-input-glow" />
                     </div>
                   </div>
 
                   {/* Error */}
                   {error && (
-                    <div className="flex items-center gap-2.5 mb-6 px-4 py-3 rounded-xl animate-fade-in animate-shake" style={{
-                      background: 'rgba(255, 107, 107, 0.06)',
-                      border: '1px solid rgba(255, 107, 107, 0.1)'
-                    }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                    <div className="login-error">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="var(--accent-red)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0"
+                      >
                         <circle cx="12" cy="12" r="10" />
                         <line x1="12" y1="8" x2="12" y2="12" />
                         <line x1="12" y1="16" x2="12.01" y2="16" />
                       </svg>
-                      <span className="text-[13px]" style={{ color: 'var(--accent-red)' }}>{error}</span>
+                      <span>{error}</span>
                     </div>
                   )}
 
                   {/* Submit */}
                   <button
                     type="submit"
-                    disabled={isSubmitting || !office.trim() || !password.trim()}
-                    className="w-full py-4 rounded-xl font-display font-bold text-[15px] tracking-[-0.01em] text-white transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed ripple-container"
-                    style={{
-                      background: 'linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-dim) 100%)',
-                      boxShadow: '0 4px 16px rgba(77, 141, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.06) inset'
-                    }}
-                    onClick={handleRipple}
+                    disabled={
+                      isSubmitting || !office.trim() || !password.trim()
+                    }
+                    className="login-submit"
                   >
                     {isSubmitting ? (
-                      <span className="flex items-center justify-center gap-3">
-                        <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <span className="login-submit-loading">
+                        <svg
+                          className="animate-spin"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
                           <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                         </svg>
                         Signing in...
@@ -273,11 +305,9 @@ export default function LoginPage() {
                   </button>
                 </form>
 
-                {/* Footer hint */}
-                <div className="mt-6 pt-5" style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-                  <p className="text-center text-[12px] tracking-wide" style={{ color: 'var(--text-ghost)' }}>
-                    Contact your administrator for credentials
-                  </p>
+                {/* Footer */}
+                <div className="login-form-footer">
+                  <p>Contact your administrator for credentials</p>
                 </div>
               </div>
             </div>
