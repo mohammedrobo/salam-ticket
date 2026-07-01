@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { type Driver } from '@/lib/types';
 import DriverCard from '@/components/DriverCard';
 import SkeletonCard from '@/components/SkeletonCard';
-import AnimatedCounter from '@/components/AnimatedCounter';
 import { CountBadge } from '@/components/Badge';
 
 export default function Dashboard() {
@@ -19,11 +18,6 @@ export default function Dashboard() {
   const [exitingIds, setExitingIds] = useState<Set<number>>(new Set());
 
   const isArabic = office ? ['QCA1', 'QCA2', 'QCA3'].includes(office) : false;
-
-  const qrUrl = useMemo(
-    () => office ? `/api/qr?office=${office}` : '/api/qr',
-    [office]
-  );
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -158,6 +152,33 @@ export default function Dashboard() {
               <span>{office}</span>
             </div>
 
+            <a
+              href={`/qr?office=${office}`}
+              target="_blank"
+              className="command-signout ripple-container"
+              style={{ textDecoration: 'none' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              <span>{isArabic ? 'رمز QR' : 'QR Code'}</span>
+            </a>
+
+            <button
+              onClick={() => router.push('/analytics')}
+              className="command-signout ripple-container"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+              <span>{isArabic ? 'التحليلات' : 'Analytics'}</span>
+            </button>
+
             <button
               onClick={async () => {
                 await fetch('/api/auth/logout', { method: 'POST' });
@@ -183,60 +204,9 @@ export default function Dashboard() {
       </header>
 
       {/* Main content */}
-      <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col lg:flex-row gap-12 p-8 relative z-10">
-        {/* LEFT: QR Panel */}
-        <div className="qr-panel rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br from-[var(--bg-elevated)] to-[var(--bg-surface)] border border-[var(--border-subtle)] animate-slide-left relative">
-          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[var(--accent-blue-glow)] rounded-full blur-[100px] pointer-events-none" />
-          <div className="qr-display animate-scale-in">
-            <img
-              src={qrUrl}
-              alt={`${office} check-in QR code`}
-            />
-          </div>
-
-          <div className="qr-label animate-fade-in-up delay-2 mt-4 relative z-10">
-            <h2 className="text-[var(--text-3xl)] font-display uppercase tracking-[-0.04em] font-800">Scan to Check In</h2>
-            <p className="text-[var(--text-lg)] opacity-70 mt-2">Point your camera at the QR code</p>
-          </div>
-
-          <div className="qr-actions animate-fade-in-up delay-3">
-            <a
-              href={`/print?office=${office}`}
-              target="_blank"
-              className="qr-action-btn secondary"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6 9 6 2 18 2 18 9" />
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                <rect x="6" y="14" width="12" height="8" />
-              </svg>
-              Print
-            </a>
-          </div>
-
-          <div className="flex items-center gap-12 mt-8 p-6 glass rounded-2xl animate-fade-in-up delay-4 relative z-10">
-            <div className="text-left">
-              <p className="text-[var(--text-ghost)] text-[var(--text-xs)] uppercase tracking-[0.2em] font-bold mb-2">
-                {isArabic ? 'في الطابور' : 'In Queue'}
-              </p>
-              <p className="font-display text-[var(--text-5xl)] font-800 tracking-[-0.05em] leading-none text-[var(--text-primary)]">
-                <AnimatedCounter value={waiting.length} />
-              </p>
-            </div>
-            <div className="w-px h-16 bg-[var(--border-subtle)]" />
-            <div className="text-left">
-              <p className="text-[var(--text-ghost)] text-[var(--text-xs)] uppercase tracking-[0.2em] font-bold mb-2">
-                {isArabic ? 'تم اليوم' : 'Done Today'}
-              </p>
-              <p className="font-display text-[var(--text-5xl)] font-800 tracking-[-0.05em] leading-none text-[var(--accent-emerald)]">
-                <AnimatedCounter value={completed.length} />
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT: Driver List */}
-        <div className="driver-list-panel flex-1 bg-[var(--bg-surface)]/40 rounded-3xl border border-[var(--border-subtle)] backdrop-blur-md">
+      <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col gap-12 p-8 relative z-10">
+        {/* Driver List */}
+        <div className="driver-list-panel flex-1 bg-[var(--bg-surface)]/40 rounded-3xl border border-[var(--border-subtle)] backdrop-blur-md p-8">
           <div className="driver-list-header animate-fade-in-up delay-1 border-b border-[var(--border-subtle)] pb-8 mb-8">
             <h2 className="text-[var(--text-4xl)] uppercase font-900 tracking-[-0.05em]">{isArabic ? 'الطابور' : 'Queue'}</h2>
             <div className="flex items-center gap-3">

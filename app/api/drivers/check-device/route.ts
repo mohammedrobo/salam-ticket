@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from('drivers')
-      .select('id, name, status, scanned_at, break_started_at')
+      .select('id, name, status, scanned_at, break_started_at, driver_account_id')
       .eq('device_id', deviceId)
       .eq('office_id', officeId)
       .order('scanned_at', { ascending: false })

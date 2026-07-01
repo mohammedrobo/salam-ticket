@@ -28,9 +28,11 @@ const t = (office: string) => {
     dir: ar ? 'rtl' : 'ltr' as const,
     lang: ar ? 'ar' : 'en',
     checkIn: ar ? 'تسجيل الدخول' : 'Check-In',
-    enterName: ar ? 'أدخل اسمك للانضمام للطابور' : 'Enter your name to join the queue',
+    enterName: ar ? 'أدخل اسمك ورقم هاتفك للانضمام للطابور' : 'Enter your name and phone to join the queue',
     fullName: ar ? 'الاسم الكامل' : 'Full Name',
+    phone: ar ? 'رقم الهاتف' : 'Phone Number',
     placeholder: ar ? 'محمد أحمد' : 'Ahmed Mohammed',
+    phonePlaceholder: ar ? '+966 5XX XXX XXXX' : '+1 (555) 123-4567',
     checkingIn: ar ? 'جاري التسجيل...' : 'Checking in...',
     submit: ar ? 'تسجيل' : 'Check In',
     deviceRemembered: ar ? 'جهازك محفوظ لتسجيل أسرع' : 'Your device is remembered for faster check-in',
@@ -64,6 +66,9 @@ const t = (office: string) => {
       : `This device is already registered to ${name}`,
     alreadyInQueue: ar ? 'أنت بالفعل في الطابور. انتظر حتى يتحقق منك المدير.' : 'You are already in the queue. Wait for the manager to check you out.',
     failedToRejoin: ar ? 'فشل في الانضمام' : 'Failed to re-join',
+    phoneRequired: ar ? 'رقم الهاتف مطلوب' : 'Phone number is required',
+    myProfile: ar ? 'ملفي الشخصي' : 'My Profile',
+    viewStats: ar ? 'عرض إحصائياتي' : 'View my stats',
   };
 };
 
@@ -89,6 +94,7 @@ function ScanContent() {
   );
 
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -104,6 +110,7 @@ function ScanContent() {
   const [breakRemainingMs, setBreakRemainingMs] = useState(0);
   const [stateKey, setStateKey] = useState(0);
   const [displayName, setDisplayName] = useState('');
+  const [driverAccountId, setDriverAccountId] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const deviceIdRef = useRef<string>('');
@@ -147,10 +154,12 @@ function ScanContent() {
             setAheadCount(data.position - 1);
             setTotal(data.total);
             setDriverId(data.driver.id);
+            setDriverAccountId(data.driver.driver_account_id || null);
             setSubmitted(true);
           } else if (data.status === 'on_break') {
             setDisplayName(data.driver.name);
             setDriverId(data.driver.id);
+            setDriverAccountId(data.driver.driver_account_id || null);
             setOnBreak(true);
             setBreakRemainingMs(data.break_remaining_ms || 0);
             setPosition(data.position);
@@ -158,6 +167,7 @@ function ScanContent() {
             setTotal(data.total);
           } else if (data.status === 'checked_out') {
             setRegisteredName(data.driver.name);
+            setDriverAccountId(data.driver.driver_account_id || null);
             setWelcomeBack(true);
             setDisplayName(data.driver.name);
           }
@@ -233,6 +243,12 @@ function ScanContent() {
       return;
     }
 
+    const trimmedPhone = phone.trim();
+    if (!trimmedPhone) {
+      setError(lang.phoneRequired || 'Phone number is required');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -241,6 +257,7 @@ function ScanContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: trimmed,
+          phone: trimmedPhone,
           office_id: office,
           device_id: deviceIdRef.current,
         }),
@@ -255,6 +272,7 @@ function ScanContent() {
         setAheadCount(data.position - 1);
         setTotal(data.total);
         setDriverId(data.id);
+        setDriverAccountId(data.driver_account_id || null);
         setSubmitted(true);
         triggerTransition();
       } else if (data.error === 'device_mismatch') {
@@ -265,6 +283,7 @@ function ScanContent() {
         setAheadCount(data.position - 1);
         setTotal(data.total);
         setDriverId(data.driver.id);
+        setDriverAccountId(data.driver_account_id || null);
         setSubmitted(true);
         triggerTransition();
       } else {
@@ -275,7 +294,7 @@ function ScanContent() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [name, office, lang, triggerTransition]);
+  }, [name, phone, office, lang, triggerTransition]);
 
   const handleReJoin = useCallback(async () => {
     setError('');
@@ -300,6 +319,7 @@ function ScanContent() {
         setAheadCount(data.position - 1);
         setTotal(data.total);
         setDriverId(data.id);
+        setDriverAccountId(data.driver_account_id || null);
         setWelcomeBack(false);
         setSubmitted(true);
         triggerTransition();
@@ -495,6 +515,19 @@ function ScanContent() {
                 <div className="scan-office-badge stagger-6">
                   <span>{office}</span>
                 </div>
+
+                {driverAccountId && (
+                  <a
+                    href={`/driver?id=${driverAccountId}`}
+                    className="scan-profile-link stagger-7"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <span>{lang.myProfile}</span>
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -595,6 +628,19 @@ function ScanContent() {
                 <div className="scan-office-badge stagger-6">
                   <span>{office}</span>
                 </div>
+
+                {driverAccountId && (
+                  <a
+                    href={`/driver?id=${driverAccountId}`}
+                    className="scan-profile-link stagger-7"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <span>{lang.myProfile}</span>
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -673,6 +719,19 @@ function ScanContent() {
                   </div>
                 </button>
 
+                {driverAccountId && (
+                  <a
+                    href={`/driver?id=${driverAccountId}`}
+                    className="scan-profile-link stagger-5"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <span>{lang.viewStats}</span>
+                  </a>
+                )}
+
                 <div className="scan-office-badge stagger-5">
                   <span>{office}</span>
                 </div>
@@ -731,6 +790,22 @@ function ScanContent() {
               </div>
             </div>
 
+            <div className="scan-field stagger-5b">
+              <label className="scan-label">{lang.phone}</label>
+              <div className="scan-input-wrapper">
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => { setPhone(e.target.value); setError(''); }}
+                  placeholder={lang.phonePlaceholder}
+                  className="scan-input"
+                  autoComplete="tel"
+                  dir="ltr"
+                />
+                <div className="scan-input-focus-ring" />
+              </div>
+            </div>
+
             {error && (
               <div className="scan-error animate-shake stagger-6">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="scan-error-icon">
@@ -744,7 +819,7 @@ function ScanContent() {
 
             <button
               type="submit"
-              disabled={isSubmitting || !name.trim()}
+              disabled={isSubmitting || !name.trim() || !phone.trim()}
               className="scan-cta-button scan-cta-gold ripple-container stagger-6"
               onClick={handleRipple}
             >
