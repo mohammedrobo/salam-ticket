@@ -212,7 +212,7 @@ export default function Dashboard() {
                     isArabic={isArabic}
                     variant={index === 0 ? 'next' : 'waiting'}
                     onDone={() => handleDone(driver.id)}
-                    onBreak={index === 0 ? () => handleBreak(driver.id) : undefined}
+                    onBreak={() => handleBreak(driver.id)}
                     isCompleting={completingId === driver.id}
                     exiting={exitingIds.has(driver.id)}
                   />
