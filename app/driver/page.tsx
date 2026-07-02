@@ -18,7 +18,6 @@ interface DeliveryRecord {
 interface DriverAccount {
   id: string;
   full_name: string;
-  phone: string;
   created_at: string;
 }
 
@@ -142,9 +141,6 @@ function DriverProfileContent() {
           </div>
           <div className="profile-hero-info">
             <h1 className="profile-hero-name">{account.full_name}</h1>
-            <p className="profile-hero-meta">
-              {account.phone}
-            </p>
             <div className="profile-hero-details">
               <span className="profile-hero-detail">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

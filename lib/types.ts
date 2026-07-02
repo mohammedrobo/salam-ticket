@@ -22,7 +22,6 @@ export interface DriverAccount {
   id: string;
   device_id: string;
   full_name: string;
-  phone: string;
   created_at: string;
 }
 

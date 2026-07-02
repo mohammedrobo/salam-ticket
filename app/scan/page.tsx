@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense, useMemo, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { type Driver } from '@/lib/types';
 import ScanBackground from '@/components/ScanBackground';
 
 function generateDeviceId(): string {
@@ -28,11 +27,9 @@ const t = (office: string) => {
     dir: ar ? 'rtl' : 'ltr' as const,
     lang: ar ? 'ar' : 'en',
     checkIn: ar ? 'تسجيل الدخول' : 'Check-In',
-    enterName: ar ? 'أدخل اسمك ورقم هاتفك للانضمام للطابور' : 'Enter your name and phone to join the queue',
+    enterName: ar ? 'أدخل اسمك للانضمام للطابور' : 'Enter your name to join the queue',
     fullName: ar ? 'الاسم الكامل' : 'Full Name',
-    phone: ar ? 'رقم الهاتف' : 'Phone Number',
     placeholder: ar ? 'محمد أحمد' : 'Ahmed Mohammed',
-    phonePlaceholder: ar ? '+966 5XX XXX XXXX' : '+1 (555) 123-4567',
     checkingIn: ar ? 'جاري التسجيل...' : 'Checking in...',
     submit: ar ? 'تسجيل' : 'Check In',
     deviceRemembered: ar ? 'جهازك محفوظ لتسجيل أسرع' : 'Your device is remembered for faster check-in',
@@ -43,7 +40,6 @@ const t = (office: string) => {
     youreUp: ar ? 'أنت التالي!' : "You're up!",
     managerReady: ar ? 'المدير جاهز لك' : 'the manager is ready for you',
     goToDock: ar ? 'اذهب إلى الرصيف' : 'Go to dock',
-    completeOrder: ar ? 'إتمام الطلب' : 'Complete Order',
     youreNext: ar ? 'أنت التالي!' : "You're next!",
     inTheQueue: ar ? 'في الطابور' : 'In the queue',
     getReady: ar ? 'استعد — سيتم استدعاؤك قريباً' : "get ready — you'll be called shortly",
@@ -66,7 +62,6 @@ const t = (office: string) => {
       : `This device is already registered to ${name}`,
     alreadyInQueue: ar ? 'أنت بالفعل في الطابور. انتظر حتى يتحقق منك المدير.' : 'You are already in the queue. Wait for the manager to check you out.',
     failedToRejoin: ar ? 'فشل في الانضمام' : 'Failed to re-join',
-    phoneRequired: ar ? 'رقم الهاتف مطلوب' : 'Phone number is required',
     myProfile: ar ? 'ملفي الشخصي' : 'My Profile',
     viewStats: ar ? 'عرض إحصائياتي' : 'View my stats',
   };
@@ -94,7 +89,6 @@ function ScanContent() {
   );
 
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,7 +99,6 @@ function ScanContent() {
   const [deviceLoading, setDeviceLoading] = useState(true);
   const [welcomeBack, setWelcomeBack] = useState(false);
   const [registeredName, setRegisteredName] = useState('');
-  const [driverId, setDriverId] = useState<number | null>(null);
   const [onBreak, setOnBreak] = useState(false);
   const [breakRemainingMs, setBreakRemainingMs] = useState(0);
   const [stateKey, setStateKey] = useState(0);
@@ -153,12 +146,10 @@ function ScanContent() {
             setPosition(data.position);
             setAheadCount(data.position - 1);
             setTotal(data.total);
-            setDriverId(data.driver.id);
             setDriverAccountId(data.driver.driver_account_id || null);
             setSubmitted(true);
           } else if (data.status === 'on_break') {
             setDisplayName(data.driver.name);
-            setDriverId(data.driver.id);
             setDriverAccountId(data.driver.driver_account_id || null);
             setOnBreak(true);
             setBreakRemainingMs(data.break_remaining_ms || 0);
@@ -205,24 +196,26 @@ function ScanContent() {
 
     const checkPosition = async () => {
       try {
-        const res = await fetch('/api/drivers');
-        const drivers: Driver[] = await res.json();
-
-        setTotal(drivers.length);
-
-        const myIndex = drivers.findIndex(
-          (d) => d.name.toLowerCase() === displayName.toLowerCase()
+        const res = await fetch(
+          `/api/drivers/position?device_id=${deviceIdRef.current}&office=${office}`
         );
+        const data = await res.json();
 
-        if (myIndex === -1) {
+        if (!data.found) {
           setCheckedOut(true);
           triggerTransition();
           return;
         }
 
-        setPosition(myIndex + 1);
-        setAheadCount(myIndex);
-        setDriverId(drivers[myIndex].id);
+        if (data.status === 'checked_out') {
+          setCheckedOut(true);
+          triggerTransition();
+          return;
+        }
+
+        setTotal(data.total);
+        setPosition(data.position);
+        setAheadCount(data.position - 1);
       } catch {
         // retry next interval
       }
@@ -231,7 +224,7 @@ function ScanContent() {
     checkPosition();
     const interval = setInterval(checkPosition, 3000);
     return () => clearInterval(interval);
-  }, [submitted, checkedOut, onBreak, triggerTransition, displayName]);
+  }, [submitted, checkedOut, onBreak, triggerTransition, office]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -243,12 +236,6 @@ function ScanContent() {
       return;
     }
 
-    const trimmedPhone = phone.trim();
-    if (!trimmedPhone) {
-      setError(lang.phoneRequired || 'Phone number is required');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -257,7 +244,6 @@ function ScanContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: trimmed,
-          phone: trimmedPhone,
           office_id: office,
           device_id: deviceIdRef.current,
         }),
@@ -271,7 +257,6 @@ function ScanContent() {
         setPosition(data.position);
         setAheadCount(data.position - 1);
         setTotal(data.total);
-        setDriverId(data.id);
         setDriverAccountId(data.driver_account_id || null);
         setSubmitted(true);
         triggerTransition();
@@ -282,7 +267,6 @@ function ScanContent() {
         setPosition(data.position);
         setAheadCount(data.position - 1);
         setTotal(data.total);
-        setDriverId(data.driver.id);
         setDriverAccountId(data.driver_account_id || null);
         setSubmitted(true);
         triggerTransition();
@@ -294,7 +278,7 @@ function ScanContent() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [name, phone, office, lang, triggerTransition]);
+  }, [name, office, lang, triggerTransition]);
 
   const handleReJoin = useCallback(async () => {
     setError('');
@@ -318,7 +302,6 @@ function ScanContent() {
         setPosition(data.position);
         setAheadCount(data.position - 1);
         setTotal(data.total);
-        setDriverId(data.id);
         setDriverAccountId(data.driver_account_id || null);
         setWelcomeBack(false);
         setSubmitted(true);
@@ -337,23 +320,6 @@ function ScanContent() {
     setName(e.target.value);
     setError('');
   }, []);
-
-  const handleDismiss = useCallback(async () => {
-    if (driverId) {
-      try {
-        await fetch(`/api/drivers?id=${driverId}`, { method: 'DELETE' });
-      } catch {
-        // proceed with UI reset even if API fails
-      }
-    }
-    setSubmitted(false);
-    setCheckedOut(false);
-    setPosition(null);
-    setTotal(0);
-    setRegisteredName(displayName);
-    setWelcomeBack(true);
-    triggerTransition();
-  }, [driverId, displayName, triggerTransition]);
 
   const handleRipple = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     const button = e.currentTarget;
@@ -426,15 +392,22 @@ function ScanContent() {
                   <span>{lang.goToDock}</span>
                 </div>
 
-                <button onClick={(e) => { handleDismiss(); handleRipple(e); }} className="scan-cta-button scan-cta-green ripple-container stagger-5">
-                  <div className="scan-cta-glow" />
-                  <div className="scan-cta-inner">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
+                {driverAccountId && (
+                  <a
+                    href={`/driver?id=${driverAccountId}`}
+                    className="scan-profile-link stagger-5"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
                     </svg>
-                    <span>{lang.completeOrder}</span>
-                  </div>
-                </button>
+                    <span>{lang.myProfile}</span>
+                  </a>
+                )}
+
+                <div className="scan-office-badge stagger-6">
+                  <span>{office}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -790,22 +763,6 @@ function ScanContent() {
               </div>
             </div>
 
-            <div className="scan-field stagger-5b">
-              <label className="scan-label">{lang.phone}</label>
-              <div className="scan-input-wrapper">
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => { setPhone(e.target.value); setError(''); }}
-                  placeholder={lang.phonePlaceholder}
-                  className="scan-input"
-                  autoComplete="tel"
-                  dir="ltr"
-                />
-                <div className="scan-input-focus-ring" />
-              </div>
-            </div>
-
             {error && (
               <div className="scan-error animate-shake stagger-6">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="scan-error-icon">
@@ -819,7 +776,7 @@ function ScanContent() {
 
             <button
               type="submit"
-              disabled={isSubmitting || !name.trim() || !phone.trim()}
+              disabled={isSubmitting || !name.trim()}
               className="scan-cta-button scan-cta-gold ripple-container stagger-6"
               onClick={handleRipple}
             >

@@ -113,14 +113,10 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { name, phone, office_id, device_id } = await request.json();
+    const { name, office_id, device_id } = await request.json();
 
     if (!name || name.trim() === '') {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
-    }
-
-    if (!phone || phone.trim() === '') {
-      return NextResponse.json({ error: 'Phone is required' }, { status: 400 });
     }
 
     if (!office_id || !isValidOffice(office_id)) {
@@ -156,7 +152,7 @@ export async function POST(request: Request) {
       if (existingAccount.full_name.toLowerCase() !== name.trim().toLowerCase()) {
         await supabase
           .from('driver_accounts')
-          .update({ full_name: name.trim(), phone: phone.trim() })
+          .update({ full_name: name.trim() })
           .eq('id', driverAccountId);
       }
     } else {
@@ -166,7 +162,6 @@ export async function POST(request: Request) {
         .insert({
           device_id,
           full_name: name.trim(),
-          phone: phone.trim(),
         })
         .select('id')
         .single();
